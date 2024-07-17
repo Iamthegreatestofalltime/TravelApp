@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Hotels from './hotels';
 
 export default function Home() {
   return (
@@ -10,6 +11,7 @@ export default function Home() {
     >
       <Text style={styles.title}>Welcome to Quantum Voyage</Text>
       <Text style={styles.subtitle}>Your futuristic travel planner</Text>
+      <Hotels/>
     </LinearGradient>
   );
 }
