@@ -36,6 +36,7 @@ app.post('/get-trip-plan', async (req, res) => {
 });
 
 app.post('/generate-schedule', async (req, res) => {
+  console.log("enter");
   const { days, attractions, tripType, ...otherDetails } = req.body;
 
   console.log(req.body);

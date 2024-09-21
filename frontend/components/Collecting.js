@@ -59,7 +59,7 @@ export default function Collecting() {
     
     const fetchAttractions = async () => {
         try {
-          const response = await axios.post('http://localhost:3000/get-trip-plan', {
+          const response = await axios.post('http://192.168.0.118:3000/get-trip-plan', {
             days: tripDetails.days,
             location: tripDetails.locations[0],
             money: tripDetails.budget,
@@ -81,7 +81,7 @@ export default function Collecting() {
     const generateSchedule = async () => {
         const selectedAttractions = attractions.filter(item => item.selected).map(item => item.name);
         try {
-          const response = await axios.post('http://localhost:3000/generate-schedule', {
+          const response = await axios.post('http://192.168.0.118:3000/generate-schedule', {
             days: tripDetails.days,
             attractions: selectedAttractions,
             tripType,
@@ -212,6 +212,9 @@ export default function Collecting() {
             </View>
             <TouchableOpacity style={styles.button} onPress={fetchAttractions}>
               <Text style={styles.buttonText}>Next</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setStep(0)} style={styles.startOverButton}>
+              <Text style={styles.startOverText}> Start Over </Text>
             </TouchableOpacity>
           </View>
         );
@@ -391,5 +394,16 @@ const styles = StyleSheet.create({
     color: '#ccd6f6',
     fontSize: 16,
     marginBottom: 20,
+  },
+  startOverButton: {
+    backgroundColor: '#64ffda', // Bright color for visibility
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
+  },
+  startOverText: {
+    color: '#0a192f', // Dark contrasting color for the text
+    fontSize: 16,
+    justifyContent: 'center',
   },
 });

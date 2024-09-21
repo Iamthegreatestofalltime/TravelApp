@@ -9,7 +9,7 @@ export default function Home() {
       colors={['#0a192f', '#20232a', '#292d3e']}
       style={styles.container}
     >
-      <Text style={styles.title}>Welcome to Quantum Voyage</Text>
+      <Text style={styles.title}>Welcome to Travel App</Text>
       <Text style={styles.subtitle}>Your futuristic travel planner</Text>
       <Hotels/>
     </LinearGradient>

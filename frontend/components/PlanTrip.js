@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Collecting from './Collecting'; // Import your existing Collecting component
+import CollectingTesting from './CollectingTesting';
 
 export default function PlanTrip() {
   return (
@@ -9,7 +10,7 @@ export default function PlanTrip() {
       colors={['#0a192f', '#20232a', '#292d3e']}
       style={styles.container}
     >
-      <Collecting />
+      <CollectingTesting />
     </LinearGradient>
   );
 }
