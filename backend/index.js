@@ -8,12 +8,22 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-const groq = new Groq({ apiKey: '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' });
+const groq = new Groq({ apiKey: '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' });
 
 app.post('/get-trip-plan', async (req, res) => {
+  console.log('Request body:', req.body);
   const { days, location, money } = req.body;
 
-  const prompt = `can you plan some attractions for me to see attractions near or in ${location} over the course of ${days} with a budget of ${money}, return the query in a format by listing the attractions by bullet point back to back here is an example of the possible return you could give me '•big ben •tower bridge •eye of london •buckingham palace'`;
+  const prompt = `Can you plan some attractions for me to see near or in ${location} over the course of ${days} days with a budget of ${money}? 
+  Please return the result as a JSON object where each attraction includes the following fields:
+  {
+    name: "Attraction name",
+    location: "Attraction location",
+    cost: "Cost to visit the attraction",
+    imageUrl: "A relevant image URL for the attraction."  
+    
+    NOTE: There should be slightly more attractions than necessary for the days a person is staying somewhere.
+  }`;
 
   try {
     const chatCompletion = await groq.chat.completions.create({
@@ -30,7 +40,7 @@ app.post('/get-trip-plan', async (req, res) => {
     console.log(result);
     res.json({ result });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error:', error.message);
     res.status(500).json({ error: 'An error occurred while processing your request.' });
   }
 });

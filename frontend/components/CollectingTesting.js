@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Dimensions, Switch } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Dimensions, Switch, FlatList, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
 
 const { width } = Dimensions.get('window');
 
 export default function CollectingTesting() {
+    const [schedule, setSchedule] = useState('');
     const [attractions, setAttractions] = useState([]);
     const [step, setStep] = useState(0);
     const [tripDetails, setTripDetails] = useState({
@@ -142,25 +144,56 @@ export default function CollectingTesting() {
     }
     const fetchAttractions = async () => {
         try {
-          const response = await axios.post('http://192.168.0.118:3000/get-trip-plan', {
+          const response = await axios.post('http://192.168.0.117:3000/get-trip-plan', {
             days: tripDetails.days,
             location: tripDetails.locations[0],
             money: tripDetails.budget,
           });
-          const attractionList = response.data.result.split('•').filter(item => item.trim() !== '');
-          setAttractions(attractionList.map(item => ({ name: item.trim(), selected: true })));
-          nextStep();
+      
+          // Log the raw API response to inspect it
+          console.log('API Response:', response.data);
+      
+          // Extract the JSON string from the response using regex to capture the attractions
+          const jsonString = response.data.result.match(/(\[.*?\])/s);
+      
+          if (jsonString && jsonString.length > 0) {
+            // Parse the JSON string into a JavaScript object
+            const attractions = JSON.parse(jsonString[0]); // Ensure we have a valid JSON
+      
+            // Prepare the attractions list for display
+            const attractionsList = attractions.map(attraction => ({
+              name: attraction.name.trim(),
+              location: attraction.location.trim(),
+              estimated_cost: attraction.cost.trim(),
+              image_url: attraction.imageUrl.trim(),
+              selected: true,
+            }));
+      
+            // Update state with the prepared attractions list
+            setAttractions(attractionsList);
+            nextStep(); // Move to the next step after fetching
+          } else {
+            console.error('No valid JSON found in the response.');
+          }
         } catch (error) {
           console.error('Error fetching attractions:', error);
         }
-    };
+      };
+      
+      const toggleAttraction = (index) => {
+        setAttractions(prev => prev.map((item, i) => 
+          i === index ? { ...item, selected: !item.selected } : item
+        ));
+      };
+    
+      
+      
     const generateSchedule = async () => {
         const selectedAttractions = attractions.filter(item => item.selected).map(item => item.name);
         try {
-          const response = await axios.post('http://192.168.0.118:3000/generate-schedule', {
+          const response = await axios.post('http://192.168.0.117:3000/generate-schedule', {
             days: tripDetails.days,
             attractions: selectedAttractions,
-            tripType,
             ...tripDetails,
           });
           setSchedule(response.data.schedule);
@@ -428,35 +461,58 @@ export default function CollectingTesting() {
                             <TouchableOpacity style={styles.button} onPress={startOver}>
                                 <Text style={styles.buttonText}>Start Over</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.button} onPress={nextStep}>
+                            <TouchableOpacity style={styles.button} onPress={fetchAttractions}>
                                 <Text style={styles.buttonText}>Next</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 );
-            case 1:
-                return (
-                    <View>
-                      <Text style={styles.stepTitle}>Select Attractions</Text>
-                      {attractions.map((item, index) => (
-                        <TouchableOpacity 
-                          key={index} 
-                          style={styles.attractionItem}
-                          onPress={() => toggleAttraction(index)}
-                        >
-                          <Text style={styles.attractionText}>{item.name}</Text>
-                          <Ionicons 
-                            name={item.selected ? "checkmark-circle" : "ellipse-outline"} 
-                            size={24} 
-                            color="#64ffda" 
-                          />
+                case 1:
+                    return (
+                      <View style={styles.container}>
+                        <Text style={styles.stepTitle}>Select Attractions</Text>
+                  
+                        {/* ScrollView for vertical scrolling */}
+                        <ScrollView>
+                          {attractions.map((item, index) => (
+                            <TouchableOpacity
+                              key={index}
+                              style={[styles.attractionCard, item.selected ? styles.selectedCard : styles.unselectedCard]}
+                              onPress={() => toggleAttraction(index)}
+                            >
+                              {/* Image at the top of each card   */}
+                              <Image
+                                source={{ uri: item.imageURL}}
+                                style={styles.attractionImage}
+                                resizeMode="cover"
+                              />
+                              <View style={styles.cardContent}>
+                                <Text style={styles.attractionName}>{item.name}</Text>
+                                <Text style={styles.attractionLocation}>Location: {item.location}</Text>
+                                <Text style={styles.attractionCost}>Cost: {item.estimated_cost}</Text>
+                              </View>
+                  
+                              {/* Selection Icon */}
+                              <Ionicons
+                                name={item.selected ? "checkmark-circle" : "ellipse-outline"}
+                                size={24}
+                                color={item.selected ? "#64ffda" : "#ccc"}
+                                style={styles.selectionIcon}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                  
+                        {/* Buttons for proceeding or going back */}
+                        <TouchableOpacity style={styles.button} onPress={generateSchedule}>
+                          <Text style={styles.buttonText}>Generate Schedule</Text>
                         </TouchableOpacity>
-                      ))}
-                      <TouchableOpacity style={styles.button} onPress={generateSchedule}>
-                        <Text style={styles.buttonText}>Generate Schedule</Text>
-                      </TouchableOpacity>
-                    </View>
-                  );
+                        <TouchableOpacity style={styles.button} onPress={prevStep}>
+                          <Text style={styles.buttonText}>Back</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  
             case 2:
                 return (
                     <View>
@@ -559,9 +615,59 @@ const styles = StyleSheet.create({
         backgroundColor: '#64ffda',
         padding: 10,
         borderRadius: 8,
+        marginBottom: 15,
+        marginTop: 10,
     },
     buttonText: {
+        flexDirection: 'row',
         color: '#0f0c29',
         fontSize: 16,
+        alignItems: 'center',
     },
+    attractionCard: {
+        borderRadius: 10,
+        marginVertical: 10,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        backgroundColor: '#fff',
+        elevation: 3, // Shadow on Android
+        shadowColor: '#000', // Shadow on iOS
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 10,
+        position: 'relative',
+      },
+      selectedCard: {
+        borderColor: '#64ffda', // Highlight the selected card
+      },
+      unselectedCard: {
+        borderColor: '#ddd',
+      },
+      attractionImage: {
+        width: '100%',
+        height: 150,
+      },
+      cardContent: {
+        padding: 16,
+      },
+      attractionName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+      },
+      attractionLocation: {
+        fontSize: 16,
+        color: '#666',
+        marginTop: 4,
+      },
+      attractionCost: {
+        fontSize: 14,
+        color: '#888',
+        marginTop: 4,
+      },
+      selectionIcon: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+      },
 });
