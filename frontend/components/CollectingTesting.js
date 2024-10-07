@@ -144,41 +144,40 @@ export default function CollectingTesting() {
     }
     const fetchAttractions = async () => {
         try {
-          const response = await axios.post('http://192.168.0.117:3000/get-trip-plan', {
-            days: tripDetails.days,
-            location: tripDetails.locations[0],
-            money: tripDetails.budget,
-          });
-      
-          // Log the raw API response to inspect it
-          console.log('API Response:', response.data);
-      
-          // Extract the JSON string from the response using regex to capture the attractions
-          const jsonString = response.data.result.match(/(\[.*?\])/s);
-      
-          if (jsonString && jsonString.length > 0) {
-            // Parse the JSON string into a JavaScript object
-            const attractions = JSON.parse(jsonString[0]); // Ensure we have a valid JSON
-      
-            // Prepare the attractions list for display
-            const attractionsList = attractions.map(attraction => ({
-              name: attraction.name.trim(),
-              location: attraction.location.trim(),
-              estimated_cost: attraction.cost.trim(),
-              image_url: attraction.imageUrl.trim(),
-              selected: true,
-            }));
-      
-            // Update state with the prepared attractions list
-            setAttractions(attractionsList);
-            nextStep(); // Move to the next step after fetching
-          } else {
-            console.error('No valid JSON found in the response.');
-          }
+            console.log('Fetching attractions with trip details:', tripDetails);
+            const response = await axios.post('http://192.168.0.117:3000/get-trip-plan', {
+                days: tripDetails.days,
+                locations: tripDetails.locations, // Ensure this is an array
+                money: tripDetails.budget,
+            });
+    
+            console.log('API Response:', response.data);
+    
+            const attractions = response.data.attractions;
+            if (attractions && attractions.length > 0) {
+                const attractionsList = attractions.map(attraction => ({
+                    name: attraction.name.trim(),
+                    location: attraction.location.trim(),
+                    estimated_cost: attraction.cost.trim(),
+                    image_url: attraction.image.trim(),
+                    selected: true,
+                }));
+    
+                setAttractions(attractionsList);
+                nextStep();
+            } else {
+                console.error('No attractions found in the response.');
+            }
         } catch (error) {
-          console.error('Error fetching attractions:', error);
+            console.error('Error fetching attractions:', error);
+            if (error.response) {
+                console.error('Response data:', error.response.data);
+                console.error('Response status:', error.response.status);
+            }
         }
-      };
+    };
+    
+
       
       const toggleAttraction = (index) => {
         setAttractions(prev => prev.map((item, i) => 
@@ -482,7 +481,7 @@ export default function CollectingTesting() {
                             >
                               {/* Image at the top of each card   */}
                               <Image
-                                source={{ uri: item.imageURL}}
+                                source={{ uri: item.image_url}}
                                 style={styles.attractionImage}
                                 resizeMode="cover"
                               />
