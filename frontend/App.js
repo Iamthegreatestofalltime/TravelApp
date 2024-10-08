@@ -1,18 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen from './components/Home';
 import PlanTripScreen from './components/PlanTrip';
-import TripsScreen from './components/Trip'
+import TripsScreen from './components/Trip';
 import AccountScreen from './components/Account';
+import Signup from './components/Signup';
+import { UserProvider } from './components/UserContext';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
 export default function App() {
-  return (
-    <NavigationContainer>
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  // Simulate checking if the user is signed in (e.g., from async storage or API)
+  useEffect(() => {
+    // Check user session or token here and set `isSignedIn`
+    const checkAuth = async () => {
+      // Simulate fetching auth state from storage or API
+      const signedIn = await fakeAuthCheck(); // Replace this with real auth logic
+      setIsSignedIn(signedIn);
+    };
+
+    checkAuth();
+  }, []);
+
+  // Fake authentication check function (replace with real logic)
+  const fakeAuthCheck = async () => {
+    // Simulate a delay
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(false), 1000); // Set this to `true` to simulate a signed-in user
+    });
+  };
+
+  // Tabs for the main application
+  function MainTabs() {
+    return (
       <Tab.Navigator
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
@@ -43,6 +70,18 @@ export default function App() {
         <Tab.Screen name="Trips" component={TripsScreen} />
         <Tab.Screen name="Account" component={AccountScreen} />
       </Tab.Navigator>
-    </NavigationContainer>
+    );
+  }
+
+  return (
+    <UserProvider>
+      <NavigationContainer>
+        <Stack.Navigator initialRouteName={isSignedIn ? 'MainTabs' : 'Signup'} screenOptions={{ headerShown: false }}>
+          {/* If signed in, show main app tabs, otherwise show signup */}
+          <Stack.Screen name="Signup" component={Signup} />
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </UserProvider>
   );
 }

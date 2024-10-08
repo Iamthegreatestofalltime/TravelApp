@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+//sexy alexey
 
 export default function Account() {
   return (
@@ -9,7 +10,6 @@ export default function Account() {
       style={styles.container}
     >
       <Text style={styles.title}>Account Settings</Text>
-      {/* Add account settings and user info here */}
     </LinearGradient>
   );
 }

@@ -2,6 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const Groq = require('groq-sdk');
 const axios = require('axios'); // For image fetching
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken'); // For token generation
+const JWT_SECRET = 'your_jwt_secret_key';
 
 const app = express();
 const port = 3000;
@@ -13,6 +17,81 @@ const groq = new Groq({ apiKey: 'gsk_pzryqI2Go38XWsQJVAgsWGdyb3FYAO1LYOYaQV7dnTd
 
 const GOOGLE_API_KEY = 'AIzaSyDT_SQPADgsefZIpn8nMXfmrcGgWsqnJ-s'; // Replace with your actual API key
 const SEARCH_ENGINE_ID = '9239ca9aba3054f8d'; // Your Search Engine ID from Google
+
+mongoose.connect('mongodb+srv://alexlotkov124:danielaronov@cluster0.q9mza.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => console.log('Connected to MongoDB'))
+  .catch((error) => console.error('MongoDB connection error:', error));
+
+// Define the User Schema
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true },
+    password: { type: String, required: true },
+    email: { type: String, required: true },
+});
+
+const User = mongoose.model('User', UserSchema);
+
+// Registration endpoint
+app.post('/register', async (req, res) => {
+    const { username, password, email } = req.body;
+
+    const userExists = await User.findOne({ username });
+
+    if (userExists) {
+        return res.status(400).json({ message: 'User already exists.' });
+    }
+
+    const emailExists = await User.findOne({ email });
+
+    if (emailExists) {
+        return res.status(400).json({ message: 'Email already in use.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new User({
+        username,
+        password: hashedPassword,
+        email
+    });
+
+    await user.save();
+
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '6h' });
+
+    res.status(201).json({ 
+        message: 'User registered.', 
+        token,
+        userId: user._id
+    });
+});
+
+// Login endpoint
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    const user = await User.findOne({ username });
+
+    if (!user) {
+        return res.status(400).json({ message: 'Invalid username or password.' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+        return res.status(400).json({ message: 'Invalid username or password.' });
+    }
+
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
+
+    res.status(200).json({ 
+        message: 'Logged in successfully.',
+        token,
+        userId: user._id
+    });
+});
 
 // Function to fetch image using Google Custom Search API
 async function getImage(query) {
