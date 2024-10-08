@@ -14,6 +14,7 @@ export default function Signup({ navigation }) {
     const loginText = " Login";
     const registerText = " Register";
     const [isLoading, setIsLoading] = useState(false);
+    const code = '192.168.5.45';
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
@@ -29,8 +30,8 @@ export default function Signup({ navigation }) {
         : { username, password };
 
         const url = isLoginOrRegister === 'register' 
-            ? 'http://localhost:3000/register' 
-            : 'http://localhost:3000/login';
+            ? `http://${code}:3000/register`
+            : `http://${code}:3000/login`;
 
         try {
             const response = await axios.post(url, payload);

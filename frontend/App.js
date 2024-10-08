@@ -10,12 +10,27 @@ import TripsScreen from './components/Trip';
 import AccountScreen from './components/Account';
 import Signup from './components/Signup';
 import { UserProvider } from './components/UserContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
   const [isSignedIn, setIsSignedIn] = useState(false);
+
+  useEffect(() => {
+    const checkLogin = async () => {
+      const token = await AsyncStorage.getItem('userId');
+      if (token) {
+        setIsSignedIn(true); // Update based on your auth logic
+      }
+      setIsLoading(false);
+    };
+
+    checkLogin();
+  }, []);
+
 
   // Simulate checking if the user is signed in (e.g., from async storage or API)
   useEffect(() => {
@@ -44,7 +59,7 @@ export default function App() {
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             let iconName;
-
+  
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
             } else if (route.name === 'Plan Trip') {
@@ -54,7 +69,7 @@ export default function App() {
             } else if (route.name === 'Account') {
               iconName = focused ? 'person' : 'person-outline';
             }
-
+  
             return <Ionicons name={iconName} size={size} color={color} />;
           },
           tabBarActiveTintColor: '#64ffda',
@@ -63,6 +78,7 @@ export default function App() {
             backgroundColor: '#0a192f',
             borderTopColor: '#20232a',
           },
+          headerShown: false, // This will hide the header
         })}
       >
         <Tab.Screen name="Home" component={HomeScreen} />
@@ -71,12 +87,12 @@ export default function App() {
         <Tab.Screen name="Account" component={AccountScreen} />
       </Tab.Navigator>
     );
-  }
+  }  
 
   return (
     <UserProvider>
       <NavigationContainer>
-        <Stack.Navigator initialRouteName={isSignedIn ? 'MainTabs' : 'Signup'} screenOptions={{ headerShown: false }}>
+        <Stack.Navigator initialRouteName={isSignedIn ? "MainTabs" : "Signup"} screenOptions={{ headerShown: false }}>
           {/* If signed in, show main app tabs, otherwise show signup */}
           <Stack.Screen name="Signup" component={Signup} />
           <Stack.Screen name="MainTabs" component={MainTabs} />
