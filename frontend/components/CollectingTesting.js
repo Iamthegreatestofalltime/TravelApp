@@ -8,6 +8,7 @@ import axios from 'axios';
 const { width } = Dimensions.get('window');
 
 export default function CollectingTesting() {
+    const ip = '0.0.0.0';
     const [schedule, setSchedule] = useState('');
     const [attractions, setAttractions] = useState([]);
     const [step, setStep] = useState(0);
@@ -145,7 +146,7 @@ export default function CollectingTesting() {
     const fetchAttractions = async () => {
         try {
             console.log('Fetching attractions with trip details:', tripDetails);
-            const response = await axios.post('http://192.168.0.117:3000/get-trip-plan', {
+            const response = await axios.post(`http://${ip}:3000/get-trip-plan`, {
                 days: tripDetails.days,
                 locations: tripDetails.locations, // Ensure this is an array
                 money: tripDetails.budget,
@@ -190,7 +191,7 @@ export default function CollectingTesting() {
     const generateSchedule = async () => {
         const selectedAttractions = attractions.filter(item => item.selected).map(item => item.name);
         try {
-          const response = await axios.post('http://192.168.0.117:3000/generate-schedule', {
+          const response = await axios.post(`http://${ip}:3000/generate-schedule`, {
             days: tripDetails.days,
             attractions: selectedAttractions,
             ...tripDetails,
