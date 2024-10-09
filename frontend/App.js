@@ -11,6 +11,7 @@ import AccountScreen from './components/Account';
 import Signup from './components/Signup';
 import { UserProvider } from './components/UserContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LoadingScreen from './components/LoadingScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -22,35 +23,21 @@ export default function App() {
   useEffect(() => {
     const checkLogin = async () => {
       const token = await AsyncStorage.getItem('userId');
+      console.log("Retrieved token:", token); // Debug log
       if (token) {
-        setIsSignedIn(true); // Update based on your auth logic
+        console.log("Navigating to MainTabs"); // Debug log
+        setIsSignedIn(true);
       }
       setIsLoading(false);
     };
-
+  
     checkLogin();
   }, []);
-
-
-  // Simulate checking if the user is signed in (e.g., from async storage or API)
-  useEffect(() => {
-    // Check user session or token here and set `isSignedIn`
-    const checkAuth = async () => {
-      // Simulate fetching auth state from storage or API
-      const signedIn = await fakeAuthCheck(); // Replace this with real auth logic
-      setIsSignedIn(signedIn);
-    };
-
-    checkAuth();
-  }, []);
-
-  // Fake authentication check function (replace with real logic)
-  const fakeAuthCheck = async () => {
-    // Simulate a delay
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(false), 1000); // Set this to `true` to simulate a signed-in user
-    });
-  };
+  
+  if (isLoading) {
+    return <LoadingScreen />; // You can create a simple loading spinner or screen
+  }
+  
 
   // Tabs for the main application
   function MainTabs() {
@@ -96,6 +83,7 @@ export default function App() {
           {/* If signed in, show main app tabs, otherwise show signup */}
           <Stack.Screen name="Signup" component={Signup} />
           <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="LoadingScreen" component={LoadingScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </UserProvider>

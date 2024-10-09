@@ -14,7 +14,7 @@ export default function Signup({ navigation }) {
     const loginText = " Login";
     const registerText = " Register";
     const [isLoading, setIsLoading] = useState(false);
-    const code = '192.168.5.45';
+    const code = '192.168.0.117';
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
@@ -42,7 +42,7 @@ export default function Signup({ navigation }) {
                     setLoggedInUsername(username);
                     setId(response.data.id);
                     await AsyncStorage.setItem('userId', response.data.userId.toString());
-                    console.log("login worked");
+                    console.log("login worked" + response.data.userId.toString());
                     navigation.navigate('MainTabs'); // Replace 'Home' with your actual route name
                 } else if (isLoginOrRegister === 'register') {
                     setIsLoginOrRegister('login');
