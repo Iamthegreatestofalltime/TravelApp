@@ -8,10 +8,12 @@ import axios from 'axios';
 const { width } = Dimensions.get('window');
 
 export default function CollectingTesting() {
-    const ip = '0.0.0.0';
+    const ip = '192.168.0.117';
+    const [loading, setLoading] = useState(false);
+    const [step, setStep] = useState(0);
+    const [finalHotels, setFinalHotels] = useState([]);
     const [schedule, setSchedule] = useState('');
     const [attractions, setAttractions] = useState([]);
-    const [step, setStep] = useState(0);
     const [tripDetails, setTripDetails] = useState({
         people: '',
         days: '',
@@ -23,7 +25,6 @@ export default function CollectingTesting() {
         hotelAmount: '',
         hotelBudget: '',
         hotelType: '',
-        maximumHotels: '',
     });
     const [transportation, setTransportation] = useState({
         needTransportation: false,
@@ -178,16 +179,45 @@ export default function CollectingTesting() {
         }
     };
     
-
-      
-      const toggleAttraction = (index) => {
-        setAttractions(prev => prev.map((item, i) => 
-          i === index ? { ...item, selected: !item.selected } : item
-        ));
-      };
+    const fetchHotels = async () => {
+        setLoading(true);
+        try {
+            if (!tripDetails.locations || tripDetails.locations.length === 0) {
+                throw new Error('Location is not defined');
+            }
+            
+            console.log('Location being sent to test.js:', tripDetails.locations[0]);
     
-      
-      
+            const testBackendResponse = await axios.post('http://localhost:5000/search-hotels', {
+                city: tripDetails.locations[0],
+                checkInDate: new Date().toISOString().split('T')[0], // Today's date
+                checkOutDate: new Date(Date.now() + tripDetails.days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                adultsNumber: tripDetails.people,
+                roomNumber: '1',
+                attractions: attractions,
+                budget: hotels.hotelBudget,
+                preferences: hotels.hotelType
+            });
+    
+            console.log("Filtered hotels from main backend:", testBackendResponse.data);
+            setFinalHotels(testBackendResponse.data);
+            setStep(2);
+        } catch (error) {
+            console.error("Error fetching hotels:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleHotelSelection = (index) => {
+        setFinalHotels(prevHotels => 
+            prevHotels.map((hotel, i) => 
+                i === index ? {...hotel, selected: !hotel.selected} : hotel
+            )
+        );
+    };
+    
+
     const generateSchedule = async () => {
         const selectedAttractions = attractions.filter(item => item.selected).map(item => item.name);
         try {
@@ -504,16 +534,62 @@ export default function CollectingTesting() {
                         </ScrollView>
                   
                         {/* Buttons for proceeding or going back */}
-                        <TouchableOpacity style={styles.button} onPress={generateSchedule}>
-                          <Text style={styles.buttonText}>Generate Schedule</Text>
+                        <TouchableOpacity style={styles.button} onPress={fetchHotels}>
+                          <Text style={styles.buttonText}>Hotels</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.button} onPress={prevStep}>
                           <Text style={styles.buttonText}>Back</Text>
                         </TouchableOpacity>
                       </View>
                     );
-                  
             case 2:
+                    return (
+                        <View style={styles.container}>
+                            <Text style={styles.stepTitle}>Select Hotels</Text>
+                            {loading ? (
+                                <Text style={styles.loadingText}>Loading hotels...</Text>
+                            ) : (
+                                <ScrollView>
+                                    {finalHotels && finalHotels.length > 0 ? (
+                                        finalHotels.map((hotel, index) => (
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={[styles.attractionCard, hotel.selected ? styles.selectedCard : styles.unselectedCard]}
+                                                onPress={() => toggleHotelSelection(index)}
+                                            >
+                                                <Image
+                                                    source={{ uri: hotel.photoUrl }}
+                                                    style={styles.attractionImage}
+                                                    resizeMode="cover"
+                                                />
+                                                <View style={styles.cardContent}>
+                                                    <Text style={styles.attractionName}>{hotel.name}</Text>
+                                                    <Text style={styles.attractionLocation}>Location: {hotel.address}</Text>
+                                                    <Text style={styles.attractionCost}>Price: {hotel.price} {hotel.currency}</Text>
+                                                    <Text style={styles.attractionRating}>Rating: {hotel.rating}</Text>
+                                                </View>
+                                                <Ionicons
+                                                    name={hotel.selected ? "checkmark-circle" : "ellipse-outline"}
+                                                    size={24}
+                                                    color={hotel.selected ? "#64ffda" : "#ccc"}
+                                                    style={styles.selectionIcon}
+                                                />
+                                            </TouchableOpacity>
+                                        ))
+                                    ) : (
+                                        <Text style={styles.noHotelsText}>No hotels found.</Text>
+                                    )}
+                                </ScrollView>
+                            )}
+                            <TouchableOpacity style={styles.button} onPress={generateSchedule}>
+                                <Text style={styles.buttonText}>Generate Schedule</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.button} onPress={prevStep}>
+                                <Text style={styles.buttonText}>Back</Text>
+                            </TouchableOpacity>
+                        </View>
+                    );
+            case 3:
                 return (
                     <View>
                       <Text style={styles.stepTitle}>Review Schedule</Text>
