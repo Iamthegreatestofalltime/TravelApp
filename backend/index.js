@@ -1,11 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const Groq = require('groq-sdk');
-const axios = require('axios'); // For image fetching
+const axios = require('axios');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken'); // For token generation
-const JWT_SECRET = 'your_jwt_secret_key';
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = 3000;
@@ -15,8 +14,9 @@ app.use(express.json());
 
 const groq = new Groq({ apiKey: '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' });
 
-const GOOGLE_API_KEY = 'AIzaSyDT_SQPADgsefZIpn8nMXfmrcGgWsqnJ-s'; // Replace with your actual API key
-const SEARCH_ENGINE_ID = '9239ca9aba3054f8d'; // Your Search Engine ID from Google
+const GOOGLE_API_KEY = 'AIzaSyDT_SQPADgsefZIpn8nMXfmrcGgWsqnJ-s';
+const SEARCH_ENGINE_ID = '9239ca9aba3054f8d';
+const JWT_SECRET = 'your_jwt_secret_key';
 
 mongoose.connect('mongodb+srv://alexlotkov124:danielaronov@cluster0.q9mza.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
     useNewUrlParser: true,
@@ -24,7 +24,6 @@ mongoose.connect('mongodb+srv://alexlotkov124:danielaronov@cluster0.q9mza.mongod
 }).then(() => console.log('Connected to MongoDB'))
   .catch((error) => console.error('MongoDB connection error:', error));
 
-// Define the User Schema
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true },
     password: { type: String, required: true },
@@ -33,7 +32,6 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', UserSchema);
 
-// Registration endpoint
 app.post('/register', async (req, res) => {
     const { username, password, email } = req.body;
 
@@ -68,7 +66,6 @@ app.post('/register', async (req, res) => {
     });
 });
 
-// Login endpoint
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
@@ -93,7 +90,6 @@ app.post('/login', async (req, res) => {
     });
 });
 
-// Function to fetch image using Google Custom Search API
 async function getImage(query) {
     try {
         console.log(`Fetching image for query: ${query}`);
@@ -101,15 +97,14 @@ async function getImage(query) {
             params: {
                 key: GOOGLE_API_KEY,
                 cx: SEARCH_ENGINE_ID,
-                searchType: 'image', // Ensures you get image results
-                q: query, // The search query
+                searchType: 'image',
+                q: query,
             }
         });
 
         console.log('Image fetch response:', response.data);
         const items = response.data.items;
         if (items && items.length > 0) {
-            // Return the first image link
             return items[0].link;
         } else {
             return 'No images found.';
@@ -120,12 +115,10 @@ async function getImage(query) {
     }
 }
 
-// Endpoint to get a trip plan and include images for each attraction
 app.post('/get-trip-plan', async (req, res) => {
     console.log('Request body:', req.body);
     const { days, locations, money } = req.body;
 
-    // Validate locations array
     if (!Array.isArray(locations) || locations.length === 0) {
         console.error('Invalid locations provided:', locations);
         return res.status(400).json({ error: 'Invalid locations provided.' });
@@ -156,23 +149,19 @@ app.post('/get-trip-plan', async (req, res) => {
 
         console.log('Chat completion response:', chatCompletion);
         
-        // Log the raw message content before parsing
         const rawContent = chatCompletion.choices[0]?.message?.content;
-        console.log('Raw AI response:', rawContent); // Log the raw content
+        console.log('Raw AI response:', rawContent);
 
-        // Use regex to extract the JSON array from the response
         const jsonMatch = rawContent.match(/(\[.*?\])/s);
-        const jsonString = jsonMatch ? jsonMatch[0] : "[]"; // Fallback to empty array if no match found
+        const jsonString = jsonMatch ? jsonMatch[0] : "[]";
 
-        console.log('Extracted JSON String:', jsonString); // Log the extracted JSON string
+        console.log('Extracted JSON String:', jsonString);
 
-        // Remove comments from JSON string if any
         const cleanJsonString = jsonString.replace(/\/\/.*$/gm, '').trim();
 
         let attractions = JSON.parse(cleanJsonString || "[]");
         console.log('Parsed attractions:', attractions);
         
-        // Fetch images for each attraction
         const attractionsWithImages = await Promise.all(
             attractions.map(async (attraction) => {
                 const imageUrl = await getImage(attraction.name);
@@ -185,7 +174,6 @@ app.post('/get-trip-plan', async (req, res) => {
 
         console.log('Attractions with images:', attractionsWithImages);
         
-        // Return the actual attractions in the response
         res.json({ attractions: attractionsWithImages });
     } catch (error) {
         console.error('Error during attraction planning:', error.message);
@@ -193,8 +181,6 @@ app.post('/get-trip-plan', async (req, res) => {
     }
 });
 
-
-// Endpoint to generate a schedule based on attractions
 app.post('/generate-schedule', async (req, res) => {
     console.log("Generating schedule with request body:", req.body);
     const { days, attractions, tripType, ...otherDetails } = req.body;
@@ -225,7 +211,50 @@ app.post('/generate-schedule', async (req, res) => {
     }
 });
 
-// Start the server
+app.post('/filter-hotels', async (req, res) => {
+    const { hotels, attractions, budget, preferences } = req.body;
+  
+    const prompt = `Given the following list of hotels and attractions, filter the hotels based on these criteria:
+    1. Price should be within the budget of ${budget} USD per night
+    2. Proximity to attractions (consider the hotel's location compared to the attractions' locations)
+    3. User preferences: ${preferences}
+  
+    Hotels: ${JSON.stringify(hotels)}
+    Attractions: ${JSON.stringify(attractions)}
+  
+    Return a JSON array of the filtered hotels, including a brief explanation for each hotel on why it was selected. The structure should be:
+    [
+      {
+        "name": "Hotel Name",
+        "price": 100,
+        "currency": "USD",
+        "location": {
+          "latitude": 40.7128,
+          "longitude": -74.0060
+        },
+        "rating": 8.5,
+        "reviewCount": 1000,
+        "address": "123 Main St, City, Country",
+        "photoUrl": "https://example.com/hotel-photo.jpg",
+        "explanation": "This hotel was selected because..."
+      },
+      ...
+    ]`;
+  
+    try {
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [{ role: "user", content: prompt }],
+        model: "llama3-8b-8192",
+      });
+      const filteredHotels = JSON.parse(chatCompletion.choices[0]?.message?.content || "[]");
+      console.log(filteredHotels);
+      res.json(filteredHotels);
+    } catch (error) {
+      console.error('Error filtering hotels:');
+      res.status(500).json({ error: 'An error occurred while filtering hotels' });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
