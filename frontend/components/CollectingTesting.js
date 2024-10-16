@@ -8,7 +8,7 @@ import axios from 'axios';
 const { width } = Dimensions.get('window');
 
 export default function CollectingTesting() {
-    const ip = '0.0.0.0';
+    const ip = '192.168.5.45';
     const [schedule, setSchedule] = useState('');
     const [attractions, setAttractions] = useState([]);
     const [step, setStep] = useState(0);

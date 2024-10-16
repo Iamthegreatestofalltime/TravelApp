@@ -14,8 +14,8 @@ export default function Signup({ navigation }) {
     const loginText = " Login";
     const registerText = " Register";
     const [isLoading, setIsLoading] = useState(false);
-    const code = '0.0.0.0';
-    //192.168.0.117
+    const code = '192.168.5.45';
+    //192.168.5.45
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
