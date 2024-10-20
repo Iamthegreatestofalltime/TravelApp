@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Collecting from './Collecting'; // Import your existing Collecting component
 import CollectingTesting from './CollectingTesting';
 
 export default function PlanTrip() {

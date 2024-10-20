@@ -211,50 +211,6 @@ app.post('/generate-schedule', async (req, res) => {
     }
 });
 
-app.post('/filter-hotels', async (req, res) => {
-    const { hotels, attractions, budget, preferences } = req.body;
-  
-    const prompt = `Given the following list of hotels and attractions, filter the hotels based on these criteria:
-    1. Price should be within the budget of ${budget} USD per night
-    2. Proximity to attractions (consider the hotel's location compared to the attractions' locations)
-    3. User preferences: ${preferences}
-  
-    Hotels: ${JSON.stringify(hotels)}
-    Attractions: ${JSON.stringify(attractions)}
-  
-    Return a JSON array of the filtered hotels, including a brief explanation for each hotel on why it was selected. The structure should be:
-    [
-      {
-        "name": "Hotel Name",
-        "price": 100,
-        "currency": "USD",
-        "location": {
-          "latitude": 40.7128,
-          "longitude": -74.0060
-        },
-        "rating": 8.5,
-        "reviewCount": 1000,
-        "address": "123 Main St, City, Country",
-        "photoUrl": "https://example.com/hotel-photo.jpg",
-        "explanation": "This hotel was selected because..."
-      },
-      ...
-    ]`;
-  
-    try {
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [{ role: "user", content: prompt }],
-        model: "llama3-8b-8192",
-      });
-      const filteredHotels = JSON.parse(chatCompletion.choices[0]?.message?.content || "[]");
-      console.log(filteredHotels);
-      res.json(filteredHotels);
-    } catch (error) {
-      console.error('Error filtering hotels:');
-      res.status(500).json({ error: 'An error occurred while filtering hotels' });
-    }
-});
-
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
