@@ -188,7 +188,7 @@ export default function CollectingTesting() {
             
             console.log('Location being sent to test.js:', tripDetails.locations[0]);
     
-            const testBackendResponse = await axios.post('http://192.168.5.45:5002/search-hotels', {
+            const testBackendResponse = await axios.post('http://192.168.5.45:3000/search-hotels', {
                 city: tripDetails.locations[0],
                 checkInDate: new Date().toISOString().split('T')[0], // Today's date
                 checkOutDate: new Date(Date.now() + tripDetails.days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
