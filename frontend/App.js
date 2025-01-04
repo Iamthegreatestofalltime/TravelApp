@@ -34,11 +34,6 @@ export default function App() {
     checkLogin();
   }, []);
   
-  if (isLoading) {
-    return <LoadingScreen />; // You can create a simple loading spinner or screen
-  }
-  
-
   // Tabs for the main application
   function MainTabs() {
     return (
@@ -83,7 +78,6 @@ export default function App() {
           {/* If signed in, show main app tabs, otherwise show signup */}
           <Stack.Screen name="Signup" component={Signup} />
           <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="LoadingScreen" component={LoadingScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </UserProvider>
