@@ -8,10 +8,11 @@ import axios from 'axios';
 const { width } = Dimensions.get('window');
 
 export default function CollectingTesting() {
-    const ip = '192.168.5.45';
+    const ip = '192.168.0.118';
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(0);
     const [finalHotels, setFinalHotels] = useState([]);
+    const [finalFlights, setFinalFlights] = useState([]);
     const [schedule, setSchedule] = useState('');
     const [attractions, setAttractions] = useState([]);
     const [tripDetails, setTripDetails] = useState({
@@ -24,7 +25,6 @@ export default function CollectingTesting() {
         needHotels: false,
         hotelAmount: '',
         hotelBudget: '',
-        hotelType: '',
     });
     const [transportation, setTransportation] = useState({
         needTransportation: false,
@@ -116,7 +116,6 @@ export default function CollectingTesting() {
             needHotels: false,
             hotelAmount: '',
             hotelBudget: '',
-            hotelType: '',
             maximumHotels: '',
         });
         setTransportation({
@@ -188,7 +187,7 @@ export default function CollectingTesting() {
             
             console.log('Location being sent to test.js:', tripDetails.locations[0]);
     
-            const testBackendResponse = await axios.post('http://192.168.5.45:3000/search-hotels', {
+            const testBackendResponse = await axios.post('http://192.168.0.118:3000/search-hotels', {
                 city: tripDetails.locations[0],
                 checkInDate: new Date().toISOString().split('T')[0], // Today's date
                 checkOutDate: new Date(Date.now() + tripDetails.days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -196,7 +195,6 @@ export default function CollectingTesting() {
                 roomNumber: '1',
                 attractions: attractions,
                 budget: hotels.hotelBudget,
-                preferences: hotels.hotelType
             });
     
             console.log("Filtered hotels from main backend:", testBackendResponse.data);
@@ -222,6 +220,61 @@ export default function CollectingTesting() {
           i === index ? { ...item, selected: !item.selected } : item
         ));
     };
+
+    
+    const fetchFlights = async () => {
+        setLoading(true);
+        try {
+            // Check if tripDetails.locations is valid
+            if (!tripDetails.locations || tripDetails.locations.length === 0) {
+                throw new Error('Location is not defined');
+            }
+    
+            // Log the location being sent
+            const originLocation = tripDetails.locations[0]; // Keep the location static for now
+            const destinationLocation = "LAX"; // Destination location static for now
+            
+            console.log('Location being sent to index.js:', originLocation);
+            
+            // Connect to the backend using axios to get flight data
+
+            console.log('Sending request to backend...');
+            const testBackendResponse = await axios.post('http://192.168.0.118:3000/search-flights', {
+                originLocationCode: "JFK", // Use the location dynamically
+                destinationLocationCode: "LAX", // Static destination for now
+                departureDate: "2025-11-01", // Static for now
+                cabinClass: "ECONOMY", // Static for now
+                travelersCount: 1 // Static for now
+            });
+    
+            console.log("Filtered transportations from main backend:", testBackendResponse.data);
+    
+            // Check if flights are returned and update the state
+            if (testBackendResponse.data && testBackendResponse.data.flights && testBackendResponse.data.flights.length > 0) {
+                setFinalFlights(testBackendResponse.data.flights); // Set the flight data
+                setStep(3); // Move to the next step
+            } else {
+                console.log("No flights found");
+                setFinalFlights([]); // Clear flight data if none found
+                setStep(3); // Proceed to the next step
+            }
+        } catch (error) {
+            console.error("Error fetching flights:", error);
+            setFinalFlights([]); // Clear any previous flight data
+        } finally {
+            setLoading(false);
+        }
+        console.log("This is finalFlight:", JSON.stringify(finalFlights, null, 2));
+    };
+    
+    const toggleFinalFlights = (index) => {
+        setFinalFlights(prevFlights => 
+            prevFlights.map((flight, i) => 
+                i === index ? {...flight, selected: !flight.selected} : flight
+            )
+        );
+    }
+
 
     const generateSchedule = async () => {
         const selectedAttractions = attractions.filter(item => item.selected).map(item => item.name);
@@ -303,13 +356,6 @@ export default function CollectingTesting() {
                                     placeholderTextColor="#8892b0"
                                     value={hotels.hotelBudget}
                                     onChangeText={(value) => changeHotelsDetails('hotelBudget', value)}
-                                />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Hotel type (e.g., Luxury, Budget)"
-                                    placeholderTextColor="#8892b0"
-                                    value={hotels.hotelType}
-                                    onChangeText={(value) => changeHotelsDetails('hotelType', value)}
                                 />
                                 <TextInput
                                     style={styles.input}
@@ -586,15 +632,83 @@ export default function CollectingTesting() {
                                     )}
                                 </ScrollView>
                             )}
-                            <TouchableOpacity style={styles.button} onPress={generateSchedule}>
-                                <Text style={styles.buttonText}>Generate Schedule</Text>
+                            <TouchableOpacity style={styles.button} onPress={fetchFlights}>
+                                <Text style={styles.buttonText}>Flights</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.button} onPress={prevStep}>
                                 <Text style={styles.buttonText}>Back</Text>
                             </TouchableOpacity>
                         </View>
                     );
-            case 3:
+                    case 3:
+                        return (
+                          <View style={styles.container}>
+                            <Text style={styles.stepTitle}>Select Flights</Text>
+                            {loading ? (
+                              <Text style={styles.loadingText}>Loading Flights...</Text>
+                            ) : (
+                              <ScrollView contentContainerStyle={styles.scrollViewContent}>
+                                {finalFlights && finalFlights.length > 0 ? (
+                                  finalFlights.map((flight, index) => (
+                                    <TouchableOpacity
+                                      key={index}
+                                      style={[
+                                        styles.flightCard,
+                                        flight.selected ? styles.selectedCard : styles.unselectedCard,
+                                      ]}
+                                      onPress={() => toggleFinalFlights(index)}
+                                    >
+                                      <View style={styles.flightDetails}>
+                                        <Text style={styles.flightRoute}>
+                                          {flight.departureAirport ? flight.departureAirport : 'Unknown Departure'} {'  '}
+                                          <Ionicons name="arrow-forward" size={20} color="#64ffda" />
+                                          {'  '} 
+                                          {flight.arrivalAirport ? flight.arrivalAirport : 'Unknown Arrival'}
+                                        </Text>
+                                        
+                                        {flight.connections && flight.connections.length > 0 && (
+                                          <View style={styles.connections}>
+                                            {flight.connections.map((connection, idx) => (
+                                              <Text key={idx} style={styles.connectionText}>
+                                                <Ionicons name="arrow-forward" size={16} color="#64ffda" />
+                                                {' '} {connection}
+                                              </Text>
+                                            ))}
+                                          </View>
+                                        )}
+                      
+                                        <Text style={styles.flightAirline}>
+                                          Airline: {flight.airline ? flight.airline : 'Unknown Airline'}
+                                        </Text>
+                                        <Text style={styles.flightPrice}>
+                                          Price: {flight.price} {flight.currency}
+                                        </Text>
+                                      </View>
+                                      <Ionicons
+                                        name={flight.selected ? 'checkmark-circle' : 'ellipse-outline'}
+                                        size={24}
+                                        color={flight.selected ? '#64ffda' : '#ccc'}
+                                        style={styles.selectionIcon}
+                                      />
+                                    </TouchableOpacity>
+                                  ))
+                                ) : (
+                                  <Text style={styles.noFlightsText}>No flights found.</Text>
+                                )}
+                              </ScrollView>
+                            )}
+                            <View style={styles.buttonContainer}>
+                              <TouchableOpacity style={styles.button} onPress={generateSchedule}>
+                                <Text style={styles.buttonText}>Generate Schedule</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity style={styles.button} onPress={prevStep}>
+                                <Text style={styles.buttonText}>Back</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      
+            case 4:
                 return (
                     <View>
                       <Text style={styles.stepTitle}>Review Schedule</Text>
@@ -751,4 +865,85 @@ const styles = StyleSheet.create({
         top: 10,
         right: 10,
       },
+      flightCard: {
+        borderRadius: 10,
+        marginVertical: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        backgroundColor: '#fff',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 10,
+        position: 'relative',
+      },
+      selectedCard: {
+        borderColor: '#64ffda', 
+      },
+      unselectedCard: {
+        borderColor: '#ddd',
+      },
+      flightDetails: {
+        padding: 16,
+      },
+      flightRoute: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 6,
+        textAlign: 'center',
+      },
+      connections: {
+        marginTop: 10,
+      },
+      connectionText: {
+        fontSize: 14,
+        color: '#64ffda',
+        marginVertical: 4,
+        textAlign: 'center',
+      },
+      flightAirline: {
+        fontSize: 16,
+        color: '#666',
+        marginTop: 6,
+        textAlign: 'center',
+      },
+      flightPrice: {
+        fontSize: 16,
+        color: '#888',
+        marginTop: 6,
+        textAlign: 'center',
+      },
+      selectionIcon: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+      },
+      noFlightsText: {
+        fontSize: 18,
+        color: '#fff',
+        textAlign: 'center',
+        marginTop: 20,
+      },
+      buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-evenly',
+        marginTop: 20,
+      },
+      button: {
+        backgroundColor: '#64ffda',
+        paddingVertical: 12,
+        paddingHorizontal: 25,
+        borderRadius: 8,
+        marginBottom: 15,
+        marginTop: 10,
+      },
+      buttonText: {
+        color: '#0f0c29',
+        fontSize: 16,
+        textAlign: 'center',
+      },
+      
 });
