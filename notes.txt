@@ -1,0 +1,12 @@
+home page - 
+ticket tracking relevant to trip & potential attractions
+
+booking - 
+plane flight tickets
+rework hotel algo for better reccomendations
+
+trips page - 
+shows the trips we've booked
+allow to set tracking on certain tickets
+- under specific trip
+    add trip tracking stuff

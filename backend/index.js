@@ -14,10 +14,13 @@ app.use(express.json());
 
 const groq = new Groq({ apiKey: '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' });
 
+
+const RAPIDAPI_KEY = 'd0f0fb239emsh42f8328ed505009p1f810djsn353cca051a8f';
+const RAPIDAPI_HOST = 'booking-com15.p.rapidapi.com';
+
 const GOOGLE_API_KEY = 'AIzaSyDT_SQPADgsefZIpn8nMXfmrcGgWsqnJ-s';
 const SEARCH_ENGINE_ID = '9239ca9aba3054f8d';
 const JWT_SECRET = 'your_jwt_secret_key';
-const AMADEUS_API = 'o4jXgIvXCy7s3YvUgNtrtbMis7vXYeDr'
 mongoose.connect('mongodb+srv://alexlotkov124:danielaronov@cluster0.q9mza.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
     useNewUrlParser: true,
     useUnifiedTopology: true
@@ -296,7 +299,7 @@ app.post('/search-hotels', async (req, res) => {
         }
 
         // Format the hotels and limit to 3 results
-        const formattedHotels = hotels.slice(0, 50).map(hotel => ({
+        const formattedHotels = hotels.slice(0, 5).map(hotel => ({
             name: hotel.name,
             price: hotel.priceBreakdown?.grossPrice?.value,
             currency: hotel.priceBreakdown?.currency,
@@ -320,91 +323,84 @@ app.post('/search-hotels', async (req, res) => {
     }
 });
 
-app.post('/search-flights', async (req, res) => {
-    const { originLocationCode, destinationLocationCode, departureDate, cabinClass, travelersCount } = req.body;
+app.post('/flight-search', async (req, res) => {
+    const {
+        originLocationCode = 'BOM.AIRPORT', // Ensure airport codes have `.AIRPORT`
+        destinationLocationCode = 'DEL.AIRPORT',
+        departureDate = '2025-06-06',
+        returnDate = '2025-02-27',
+        cabinClass = 'ECONOMY',
+        travelersCount = 1,
+    } = req.body;
 
-    // Validate input
-    if (!originLocationCode || !destinationLocationCode || !departureDate || !travelersCount) {
-        return res.status(400).json({ error: 'Missing required fields: originLocationCode, destinationLocationCode, departureDate, travelersCount.' });
+    // Validate required parameters
+    if (!originLocationCode || !destinationLocationCode || !departureDate) {
+        return res.status(400).json({
+            error: 'Missing required parameters: originLocationCode, destinationLocationCode, or departureDate.',
+        });
     }
 
-    // Construct the request payload for the Amadeus API
-    const amadeusPayload = {
-        currencyCode: "USD",
-        originDestinations: [
-            {
-                id: "1",
-                originLocationCode,
-                destinationLocationCode,
-                departureDateTimeRange: {
-                    date: departureDate,
-                    time: "10:00:00"
-                }
-            }
-        ],
-        travelers: Array.from({ length: travelersCount }, (_, i) => ({
-            id: (i + 1).toString(),
-            travelerType: "ADULT"
-        })),
-        sources: ["GDS"],
-        searchCriteria: {
-            maxFlightOffers: 10, // Adjust this as needed
-            flightFilters: {
-                cabinRestrictions: [
-                    {
-                        cabin: cabinClass || "ECONOMY",
-                        coverage: "MOST_SEGMENTS",
-                        originDestinationIds: ["1"]
-                    }
-                ]
-            }
-        }
+    const options = {
+        method: 'GET',
+        url: 'https://booking-com15.p.rapidapi.com/api/v1/flights/searchFlights',
+        params: {
+            fromId: 'JFK.AIRPORT',
+            toId: 'LAX.AIRPORT',
+            departDate: '2025-02-21',
+            returnDate: '2025-02-27',
+            pageNo: '1',
+            adults: '1',
+            children: '2',
+            sort: 'BEST',
+            cabinClass: 'ECONOMY',
+            currency_code: 'USD'
+        },
+        headers: {
+            'x-rapidapi-key': '85c91089b0msh686addf0b8fc375p1419b1jsnbc1746df1099',
+            'x-rapidapi-host': 'booking-com15.p.rapidapi.com',
+        },
     };
 
     try {
-        const response = await axios.post('https://test.api.amadeus.com/v2/shopping/flight-offers', amadeusPayload, {
-            headers: {
-                Authorization: `Bearer 7MH5lerLIlIgoFlXc9uBCzjegGx0`, 
-                'Content-Type': 'application/json'
-            }
-        });
-        console.log("Amadeus API Response:", response.data);
-        const flightOffers = response.data.data;
+        const response = await axios.request(options);
+        console.log(response.data);
 
-        if (!flightOffers || flightOffers.length === 0) {
-            return res.status(404).json({ error: 'No flight offers found.' });
-        }
-        flightOffers.forEach(flight => {
-            console.log(`Flight ID: ${flight.id}`);
-            console.log(`Price:`, flight.price);  // Log the price object
-            console.log(`Itineraries:`, flight.itineraries);  // Log the itineraries array
-            console.log(`Pricing Options:`, flight.pricingOptions);  // Log the pricing options
-        });
+        if (response.data?.data?.flightOffers) {
+            const flights = response.data.data.flightOffers.map((flight) => {
+                return {
+                    airline: flight.segments[0].legs[0].carriersData?.[0]?.name || 'Unknown',
+                    logo: flight.segments[0].legs[0].carriersData?.[0]?.logo || null,
+                    price: flight.priceBreakdown?.total?.units || 'Unknown',
+                    currency: flight.priceBreakdown?.total?.currencyCode || 'USD',
+                    departureAirport: flight.segments?.[0]?.departureAirport?.name || 'Unknown',
+                    departureCity: flight.segments?.[0]?.departureAirport?.cityName || 'Unknown',
+                    arrivalAirport: flight.segments?.[0]?.arrivalAirport?.name || 'Unknown',
+                    arrivalCity: flight.segments?.[0]?.arrivalAirport?.cityName || 'Unknown',
+                    departureTime: flight.segments?.[0]?.departureTime || 'Unknown',
+                    arrivalTime: flight.segments?.[0]?.arrivalTime || 'Unknown',
+                    connections: flight.segments?.length > 1 ? flight.segments.length - 1 : 0,
+                    duration: flight.segments?.reduce((total, segment) => total + segment.totalTime, 0) || 'Unknown',
+                    baggageInfo: {
+                        cabinBaggage: flight.travellerCabinLuggage?.[0]?.luggageAllowance || 'Unknown',
+                        checkedBaggage: flight.travellerCheckedLuggage?.[0]?.luggageAllowance || 'Unknown',
+                    },
+                    amenities: flight.legs?.[0]?.amenities || [],
+                };
+            });
+            console.log('Full details of the last flight:', JSON.stringify(response.data.data.flightOffers));
         
-        // Format and return the flight offers
-        const formattedFlights = flightOffers.map(flight => {
-            const segments = flight.itineraries[0].segments;
-            return {
-                id: flight.id,
-                price: flight.price.total,  // Total price
-                currency: flight.price.currency,  // Currency
-                departureTime: segments[0].departure.at,  // Departure time
-                arrivalTime: segments[segments.length - 1].arrival.at,  // Arrival time
-                airline: segments[0].carrierCode,  // Carrier code (can be used for airline name)
-                flightNumber: segments[0].flightNumber,  // Flight number
-                duration: segments[0].duration,  // Flight duration
-                link: flight.links ? flight.links.self : null  // Flight details link (if available)
-            };
-        });
-
-        res.status(200).json({ flights: formattedFlights });
+            res.status(200).json({ flights });
+        } else {
+            res.status(404).json({ error: 'No flights found.' });
+        }
     } catch (error) {
-        console.error('Error fetching flights:', error);
-        res.status(500).json({ error: 'An error occurred while fetching flight offers.' });
+        console.error('Error fetching flights:', error.response?.data || error.message);
+        res.status(500).json({
+            error: 'An error occurred while fetching flight data.',
+            details: error.response?.data || null,
+        });
     }
 });
-
-
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);

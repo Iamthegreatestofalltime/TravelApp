@@ -14,7 +14,7 @@ export default function Signup({ navigation }) {
     const loginText = " Login";
     const registerText = " Register";
     const [isLoading, setIsLoading] = useState(false);
-    const code = '192.168.0.118';
+    const code = '192.168.5.45';
     React.useLayoutEffect(() => {
         navigation.setOptions({
             gestureEnabled: false, // Disable swipe back gesture on iOS

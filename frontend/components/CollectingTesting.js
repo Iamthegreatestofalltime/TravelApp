@@ -8,7 +8,7 @@ import axios from 'axios';
 const { width } = Dimensions.get('window');
 
 export default function CollectingTesting() {
-    const ip = '192.168.0.118';
+    const ip = '192.168.5.45';
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(0);
     const [finalHotels, setFinalHotels] = useState([]);
@@ -187,7 +187,7 @@ export default function CollectingTesting() {
             
             console.log('Location being sent to test.js:', tripDetails.locations[0]);
     
-            const testBackendResponse = await axios.post('http://192.168.0.118:3000/search-hotels', {
+            const testBackendResponse = await axios.post('http://192.168.5.45:3000/search-hotels', {
                 city: tripDetails.locations[0],
                 checkInDate: new Date().toISOString().split('T')[0], // Today's date
                 checkOutDate: new Date(Date.now() + tripDetails.days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -239,10 +239,10 @@ export default function CollectingTesting() {
             // Connect to the backend using axios to get flight data
 
             console.log('Sending request to backend...');
-            const testBackendResponse = await axios.post('http://192.168.0.118:3000/search-flights', {
+            const testBackendResponse = await axios.post('http://192.168.5.45:3000/flight-search', {
                 originLocationCode: "JFK", // Use the location dynamically
                 destinationLocationCode: "LAX", // Static destination for now
-                departureDate: "2025-11-01", // Static for now
+                departureDate: "2025-06-01", // Static for now
                 cabinClass: "ECONOMY", // Static for now
                 travelersCount: 1 // Static for now
             });
@@ -250,14 +250,16 @@ export default function CollectingTesting() {
             console.log("Filtered transportations from main backend:", testBackendResponse.data);
     
             // Check if flights are returned and update the state
-            if (testBackendResponse.data && testBackendResponse.data.flights && testBackendResponse.data.flights.length > 0) {
-                setFinalFlights(testBackendResponse.data.flights); // Set the flight data
-                setStep(3); // Move to the next step
+            if (testBackendResponse.data && testBackendResponse.data.flights) {
+                const flights = testBackendResponse.data.flights.map((flight) => ({
+                    ...flight,
+                    selected: false, // Add a `selected` property for toggling
+                }));
+                setFinalFlights(flights);
+                setStep(3); // Move to flight selection step
             } else {
-                console.log("No flights found");
-                setFinalFlights([]); // Clear flight data if none found
-                setStep(3); // Proceed to the next step
-            }
+                console.error('No flights found');
+            }            
         } catch (error) {
             console.error("Error fetching flights:", error);
             setFinalFlights([]); // Clear any previous flight data
@@ -642,72 +644,56 @@ export default function CollectingTesting() {
                     );
                     case 3:
                         return (
-                          <View style={styles.container}>
-                            <Text style={styles.stepTitle}>Select Flights</Text>
-                            {loading ? (
-                              <Text style={styles.loadingText}>Loading Flights...</Text>
-                            ) : (
-                              <ScrollView contentContainerStyle={styles.scrollViewContent}>
-                                {finalFlights && finalFlights.length > 0 ? (
-                                  finalFlights.map((flight, index) => (
-                                    <TouchableOpacity
-                                      key={index}
-                                      style={[
-                                        styles.flightCard,
-                                        flight.selected ? styles.selectedCard : styles.unselectedCard,
-                                      ]}
-                                      onPress={() => toggleFinalFlights(index)}
-                                    >
-                                      <View style={styles.flightDetails}>
-                                        <Text style={styles.flightRoute}>
-                                          {flight.departureAirport ? flight.departureAirport : 'Unknown Departure'} {'  '}
-                                          <Ionicons name="arrow-forward" size={20} color="#64ffda" />
-                                          {'  '} 
-                                          {flight.arrivalAirport ? flight.arrivalAirport : 'Unknown Arrival'}
-                                        </Text>
-                                        
-                                        {flight.connections && flight.connections.length > 0 && (
-                                          <View style={styles.connections}>
-                                            {flight.connections.map((connection, idx) => (
-                                              <Text key={idx} style={styles.connectionText}>
-                                                <Ionicons name="arrow-forward" size={16} color="#64ffda" />
-                                                {' '} {connection}
-                                              </Text>
-                                            ))}
-                                          </View>
-                                        )}
-                      
-                                        <Text style={styles.flightAirline}>
-                                          Airline: {flight.airline ? flight.airline : 'Unknown Airline'}
-                                        </Text>
-                                        <Text style={styles.flightPrice}>
-                                          Price: {flight.price} {flight.currency}
-                                        </Text>
-                                      </View>
-                                      <Ionicons
-                                        name={flight.selected ? 'checkmark-circle' : 'ellipse-outline'}
-                                        size={24}
-                                        color={flight.selected ? '#64ffda' : '#ccc'}
-                                        style={styles.selectionIcon}
-                                      />
-                                    </TouchableOpacity>
-                                  ))
+                            <View style={styles.container}>
+                                <Text style={styles.stepTitle}>Select Flights</Text>
+                                {loading ? (
+                                    <Text style={styles.loadingText}>Loading Flights...</Text>
                                 ) : (
-                                  <Text style={styles.noFlightsText}>No flights found.</Text>
+                                    <ScrollView contentContainerStyle={styles.scrollViewContent}>
+                                        {finalFlights.length > 0 ? (
+                                            finalFlights.map((flight, index) => (
+                                                <TouchableOpacity
+                                                    key={index}
+                                                    style={[
+                                                        styles.flightCard,
+                                                        flight.selected ? styles.selectedCard : styles.unselectedCard,
+                                                    ]}
+                                                    onPress={() => toggleFinalFlights(index)}
+                                                >
+                                                    <Text style={styles.flightRoute}>
+                                                        {flight.departureAirport} ➡️ {flight.arrivalAirport}
+                                                    </Text>
+                                                    <Text style={styles.flightAirline}>Airline: {flight.airline}</Text>
+                                                    <Text style={styles.flightPrice}>Price: {flight.price} {flight.currency}</Text>
+                                                    <Text style={styles.flightDuration}>Duration: {flight.duration}</Text>
+                                                    <Text style={styles.flightConnections}>
+                                                        {flight.connections.length > 0
+                                                            ? `Connections: ${flight.connections.join(', ')}`
+                                                            : 'Direct flight'}
+                                                    </Text>
+                                                    <Ionicons
+                                                        name={flight.selected ? 'checkmark-circle' : 'ellipse-outline'}
+                                                        size={24}
+                                                        color={flight.selected ? '#64ffda' : '#ccc'}
+                                                        style={styles.selectionIcon}
+                                                    />
+                                                </TouchableOpacity>
+                                            ))
+                                        ) : (
+                                            <Text style={styles.noFlightsText}>No flights found.</Text>
+                                        )}
+                                    </ScrollView>
                                 )}
-                              </ScrollView>
-                            )}
-                            <View style={styles.buttonContainer}>
-                              <TouchableOpacity style={styles.button} onPress={generateSchedule}>
-                                <Text style={styles.buttonText}>Generate Schedule</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity style={styles.button} onPress={prevStep}>
-                                <Text style={styles.buttonText}>Back</Text>
-                              </TouchableOpacity>
+                                <View style={styles.buttonContainer}>
+                                    <TouchableOpacity style={styles.button} onPress={generateSchedule}>
+                                        <Text style={styles.buttonText}>Generate Schedule</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.button} onPress={prevStep}>
+                                        <Text style={styles.buttonText}>Back</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                          </View>
                         );
-                      
             case 4:
                 return (
                     <View>
