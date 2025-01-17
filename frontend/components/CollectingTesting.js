@@ -260,7 +260,7 @@ export default function CollectingTesting() {
             if (testBackendResponse.data && testBackendResponse.data.flights) {
                 const flights = testBackendResponse.data.flights.map((flight) => ({
                     ...flight,
-                    selected: false, // Add a `selected` property for toggling
+                    selected: false, // Add a selected property for toggling
                 }));
                 setFinalFlights(flights);
                 setStep(3); // Move to flight selection step
@@ -269,10 +269,11 @@ export default function CollectingTesting() {
             }            
         } catch (error) {
             console.error("Error fetching flights:", error);
-            setFinalFlights([]);
+            setFinalFlights([]); // Clear any previous flight data
         } finally {
             setLoading(false);
         }
+        console.log("This is finalFlight:", JSON.stringify(finalFlights, null, 2));
     };
     
     const toggleFinalFlights = (index) => {
@@ -891,7 +892,7 @@ const styles = StyleSheet.create({
       flightRoute: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
+        color: 'black',
         marginBottom: 6,
         textAlign: 'center',
       },
@@ -956,7 +957,7 @@ const styles = StyleSheet.create({
     flightRoute: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: 'black',
     },
     flightAirline: {
         fontSize: 16,
