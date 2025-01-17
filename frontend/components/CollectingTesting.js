@@ -17,13 +17,15 @@ export default function CollectingTesting() {
     const [attractions, setAttractions] = useState([]);
     const [tripDetails, setTripDetails] = useState({
         people: '',
-        days: '',
+        checkin: '',
+        checkout: '',
         locations: [''],
         budget: '',
     });
     const [hotels, setHotels] = useState({
         needHotels: false,
-        hotelAmount: '',
+        hotelMinimum: '',
+        hotelMaximum: '',
         hotelBudget: '',
     });
     const [transportation, setTransportation] = useState({
@@ -108,7 +110,8 @@ export default function CollectingTesting() {
     const startOver = () => {
         setTripDetails({        
             people: '',
-            days: '',
+            checkin: '',
+            checkout: '',
             locations: [''],
             budget: '',
         });
@@ -144,10 +147,12 @@ export default function CollectingTesting() {
         setStep(0);
     }
     const fetchAttractions = async () => {
+  
         try {
             console.log('Fetching attractions with trip details:', tripDetails);
             const response = await axios.post(`http://${ip}:3000/get-trip-plan`, {
-                days: tripDetails.days,
+                checkin: tripDetails.checkin,
+                checkout: tripDetails.checkout,
                 locations: tripDetails.locations, // Ensure this is an array
                 money: tripDetails.budget,
             });
@@ -189,12 +194,14 @@ export default function CollectingTesting() {
     
             const testBackendResponse = await axios.post('http://192.168.0.118:3000/search-hotels', {
                 city: tripDetails.locations[0],
-                checkInDate: new Date().toISOString().split('T')[0], // Today's date
-                checkOutDate: new Date(Date.now() + tripDetails.days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                checkin: tripDetails.checkin,
+                checkout: tripDetails.checkout,
                 adultsNumber: tripDetails.people,
                 roomNumber: '1',
                 attractions: attractions,
                 budget: hotels.hotelBudget,
+                minimum: hotels.hotelMaximum,
+                maximum: hotels.hotelMaximum,
             });
     
             console.log("Filtered hotels from main backend:", testBackendResponse.data);
@@ -225,46 +232,24 @@ export default function CollectingTesting() {
     const fetchFlights = async () => {
         setLoading(true);
         try {
-            // Check if tripDetails.locations is valid
-            if (!tripDetails.locations || tripDetails.locations.length === 0) {
-                throw new Error('Location is not defined');
-            }
-    
-            // Log the location being sent
-            const originLocation = tripDetails.locations[0]; // Keep the location static for now
-            const destinationLocation = "LAX"; // Destination location static for now
-            
-            console.log('Location being sent to index.js:', originLocation);
-            
-            // Connect to the backend using axios to get flight data
-
-            console.log('Sending request to backend...');
-            const testBackendResponse = await axios.post('http://192.168.0.118:3000/search-flights', {
-                originLocationCode: "JFK", // Use the location dynamically
-                destinationLocationCode: "LAX", // Static destination for now
-                departureDate: "2025-11-01", // Static for now
-                cabinClass: "ECONOMY", // Static for now
-                travelersCount: 1 // Static for now
+            const response = await axios.post('http://192.168.0.118:3000/flight-search', {
+                originLocationCode: "JFK",
+                destinationLocationCode: "LAX",
+                departureDate: "2025-11-01",
+                cabinClass: "ECONOMY",
+                travelersCount: 1
             });
     
-            console.log("Filtered transportations from main backend:", testBackendResponse.data);
-    
-            // Check if flights are returned and update the state
-            if (testBackendResponse.data && testBackendResponse.data.flights && testBackendResponse.data.flights.length > 0) {
-                setFinalFlights(testBackendResponse.data.flights); // Set the flight data
-                setStep(3); // Move to the next step
-            } else {
-                console.log("No flights found");
-                setFinalFlights([]); // Clear flight data if none found
-                setStep(3); // Proceed to the next step
+            if (response.data) {
+                setFinalFlights(response.data);
+                setStep(3);
             }
         } catch (error) {
             console.error("Error fetching flights:", error);
-            setFinalFlights([]); // Clear any previous flight data
+            setFinalFlights([]);
         } finally {
             setLoading(false);
         }
-        console.log("This is finalFlight:", JSON.stringify(finalFlights, null, 2));
     };
     
     const toggleFinalFlights = (index) => {
@@ -280,7 +265,8 @@ export default function CollectingTesting() {
         const selectedAttractions = attractions.filter(item => item.selected).map(item => item.name);
         try {
           const response = await axios.post(`http://${ip}:3000/generate-schedule`, {
-            days: tripDetails.days,
+            checkin: tripDetails.checkin,
+            checkout: tripDetails.checkout,
             attractions: selectedAttractions,
             ...tripDetails,
           });
@@ -317,10 +303,17 @@ export default function CollectingTesting() {
                         {/* Trip duration and budget */}
                         <TextInput
                             style={styles.input}
-                            placeholder='Duration (days)'
+                            placeholder='checkin(YYYY-MM-DD)'
                             placeholderTextColor='#8892b0'
-                            value={tripDetails.days}
-                            onChangeText={(value) => changeTripDetails('days', value)}
+                            value={tripDetails.checkin}
+                            onChangeText={(value) => changeTripDetails('checkin', value)}
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder='checkout(YYYY-MM-DD)'
+                            placeholderTextColor='#8892b0'
+                            value={tripDetails.checkout}
+                            onChangeText={(value) => changeTripDetails('checkout', value)}
                         />
                         <TextInput
                             style={styles.input}
@@ -345,10 +338,17 @@ export default function CollectingTesting() {
                             <>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Number of hotels needed"
+                                    placeholder="Minimum amount of hotels"
                                     placeholderTextColor="#8892b0"
-                                    value={hotels.hotelAmount}
-                                    onChangeText={(value) => changeHotelsDetails('hotelAmount', value)}
+                                    value={hotels.hotelMinimum}
+                                    onChangeText={(value) => changeHotelsDetails('hotelMinimum', value)}
+                                />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Maximum amount of hotels"
+                                    placeholderTextColor="#8892b0"
+                                    value={hotels.hotelMaximum}
+                                    onChangeText={(value) => changeHotelsDetails('hotelMaximum', value)}
                                 />
                                 <TextInput
                                     style={styles.input}
@@ -356,13 +356,6 @@ export default function CollectingTesting() {
                                     placeholderTextColor="#8892b0"
                                     value={hotels.hotelBudget}
                                     onChangeText={(value) => changeHotelsDetails('hotelBudget', value)}
-                                />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Maximum number of hotels"
-                                    placeholderTextColor="#8892b0"
-                                    value={hotels.maximumHotels}
-                                    onChangeText={(value) => changeHotelsDetails('maximumHotels', value)}
                                 />
                             </>
                         )}
@@ -642,72 +635,69 @@ export default function CollectingTesting() {
                     );
                     case 3:
                         return (
-                          <View style={styles.container}>
-                            <Text style={styles.stepTitle}>Select Flights</Text>
-                            {loading ? (
-                              <Text style={styles.loadingText}>Loading Flights...</Text>
-                            ) : (
-                              <ScrollView contentContainerStyle={styles.scrollViewContent}>
-                                {finalFlights && finalFlights.length > 0 ? (
-                                  finalFlights.map((flight, index) => (
-                                    <TouchableOpacity
-                                      key={index}
-                                      style={[
-                                        styles.flightCard,
-                                        flight.selected ? styles.selectedCard : styles.unselectedCard,
-                                      ]}
-                                      onPress={() => toggleFinalFlights(index)}
-                                    >
-                                      <View style={styles.flightDetails}>
-                                        <Text style={styles.flightRoute}>
-                                          {flight.departureAirport ? flight.departureAirport : 'Unknown Departure'} {'  '}
-                                          <Ionicons name="arrow-forward" size={20} color="#64ffda" />
-                                          {'  '} 
-                                          {flight.arrivalAirport ? flight.arrivalAirport : 'Unknown Arrival'}
-                                        </Text>
-                                        
-                                        {flight.connections && flight.connections.length > 0 && (
-                                          <View style={styles.connections}>
-                                            {flight.connections.map((connection, idx) => (
-                                              <Text key={idx} style={styles.connectionText}>
-                                                <Ionicons name="arrow-forward" size={16} color="#64ffda" />
-                                                {' '} {connection}
-                                              </Text>
-                                            ))}
-                                          </View>
-                                        )}
-                      
-                                        <Text style={styles.flightAirline}>
-                                          Airline: {flight.airline ? flight.airline : 'Unknown Airline'}
-                                        </Text>
-                                        <Text style={styles.flightPrice}>
-                                          Price: {flight.price} {flight.currency}
-                                        </Text>
-                                      </View>
-                                      <Ionicons
-                                        name={flight.selected ? 'checkmark-circle' : 'ellipse-outline'}
-                                        size={24}
-                                        color={flight.selected ? '#64ffda' : '#ccc'}
-                                        style={styles.selectionIcon}
-                                      />
-                                    </TouchableOpacity>
-                                  ))
+                            <View style={styles.container}>
+                                <Text style={styles.stepTitle}>Select Flights</Text>
+                                {loading ? (
+                                    <Text style={styles.loadingText}>Loading Flights...</Text>
                                 ) : (
-                                  <Text style={styles.noFlightsText}>No flights found.</Text>
+                                    <ScrollView>
+                                        {finalFlights && finalFlights.length > 0 ? (
+                                            finalFlights.map((flight, index) => (
+                                                <TouchableOpacity
+                                                    key={index}
+                                                    style={[styles.flightCard, flight.selected ? styles.selectedCard : styles.unselectedCard]}
+                                                    onPress={() => toggleFinalFlights(index)}
+                                                >
+                                                    <Text style={styles.flightPrice}>${flight.price} {flight.currency}</Text>
+                                                    <Text style={styles.flightDuration}>Total Duration: {flight.duration}</Text>
+                    
+                                                    {flight.segments.map((segment, segIndex) => (
+                                                        <View key={segIndex} style={styles.segmentCard}>
+                                                            <Text style={styles.segmentAirline}>Airline: {segment.airline}</Text>
+                                                            <Text style={styles.segmentInfo}>
+                                                                From: {segment.departure.airport} at {segment.departure.time}
+                                                            </Text>
+                                                            <Text style={styles.segmentInfo}>
+                                                                To: {segment.arrival.airport} at {segment.arrival.time}
+                                                            </Text>
+                                                            <Text style={styles.segmentDuration}>
+                                                                Segment Duration: {segment.duration}
+                                                            </Text>
+                                                        </View>
+                                                    ))}
+                    
+                                                    {flight.link && (
+                                                        <TouchableOpacity
+                                                            style={styles.linkButton}
+                                                            onPress={() => Linking.openURL(flight.link)}
+                                                        >
+                                                            <Text style={styles.linkText}>View Details</Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                    
+                                                    <Ionicons
+                                                        name={flight.selected ? "checkmark-circle" : "ellipse-outline"}
+                                                        size={24}
+                                                        color={flight.selected ? "#64ffda" : "#ccc"}
+                                                        style={styles.selectionIcon}
+                                                    />
+                                                </TouchableOpacity>
+                                            ))
+                                        ) : (
+                                            <Text style={styles.noFlightsText}>No flights found.</Text>
+                                        )}
+                                    </ScrollView>
                                 )}
-                              </ScrollView>
-                            )}
-                            <View style={styles.buttonContainer}>
-                              <TouchableOpacity style={styles.button} onPress={generateSchedule}>
-                                <Text style={styles.buttonText}>Generate Schedule</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity style={styles.button} onPress={prevStep}>
-                                <Text style={styles.buttonText}>Back</Text>
-                              </TouchableOpacity>
+                                <TouchableOpacity style={styles.button} onPress={generateSchedule}>
+                                    <Text style={styles.buttonText}>Generate Schedule</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.button} onPress={prevStep}>
+                                    <Text style={styles.buttonText}>Back</Text>
+                                </TouchableOpacity>
                             </View>
-                          </View>
                         );
-                      
+                    
+                
             case 4:
                 return (
                     <View>
@@ -945,5 +935,34 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: 'center',
       },
+      flightLink: {
+        color: '#64ffda',
+        textDecorationLine: 'underline',
+        marginTop: 5,
+    },
+    flightDetails: {
+        padding: 16,
+    },
+    flightRoute: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    flightAirline: {
+        fontSize: 16,
+        color: '#ccc',
+        marginTop: 4,
+    },
+    flightDuration: {
+        fontSize: 14,
+        color: '#bbb',
+        marginTop: 4,
+    },
+    flightPrice: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#64ffda',
+        marginTop: 4,
+    },    
       
 });
