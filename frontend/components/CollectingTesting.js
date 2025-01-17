@@ -17,13 +17,15 @@ export default function CollectingTesting() {
     const [attractions, setAttractions] = useState([]);
     const [tripDetails, setTripDetails] = useState({
         people: '',
-        days: '',
+        checkin: '',
+        checkout: '',
         locations: [''],
         budget: '',
     });
     const [hotels, setHotels] = useState({
         needHotels: false,
-        hotelAmount: '',
+        hotelMinimum: '',
+        hotelMaximum: '',
         hotelBudget: '',
     });
     const [transportation, setTransportation] = useState({
@@ -108,7 +110,8 @@ export default function CollectingTesting() {
     const startOver = () => {
         setTripDetails({        
             people: '',
-            days: '',
+            checkin: '',
+            checkout: '',
             locations: [''],
             budget: '',
         });
@@ -144,10 +147,12 @@ export default function CollectingTesting() {
         setStep(0);
     }
     const fetchAttractions = async () => {
+  
         try {
             console.log('Fetching attractions with trip details:', tripDetails);
             const response = await axios.post(`http://${ip}:3000/get-trip-plan`, {
-                days: tripDetails.days,
+                checkin: tripDetails.checkin,
+                checkout: tripDetails.checkout,
                 locations: tripDetails.locations, // Ensure this is an array
                 money: tripDetails.budget,
             });
@@ -189,12 +194,14 @@ export default function CollectingTesting() {
     
             const testBackendResponse = await axios.post('http://192.168.5.45:3000/search-hotels', {
                 city: tripDetails.locations[0],
-                checkInDate: new Date().toISOString().split('T')[0], // Today's date
-                checkOutDate: new Date(Date.now() + tripDetails.days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                checkin: tripDetails.checkin,
+                checkout: tripDetails.checkout,
                 adultsNumber: tripDetails.people,
                 roomNumber: '1',
                 attractions: attractions,
                 budget: hotels.hotelBudget,
+                minimum: hotels.hotelMaximum,
+                maximum: hotels.hotelMaximum,
             });
     
             console.log("Filtered hotels from main backend:", testBackendResponse.data);
@@ -262,11 +269,10 @@ export default function CollectingTesting() {
             }            
         } catch (error) {
             console.error("Error fetching flights:", error);
-            setFinalFlights([]); // Clear any previous flight data
+            setFinalFlights([]);
         } finally {
             setLoading(false);
         }
-        console.log("This is finalFlight:", JSON.stringify(finalFlights, null, 2));
     };
     
     const toggleFinalFlights = (index) => {
@@ -282,7 +288,8 @@ export default function CollectingTesting() {
         const selectedAttractions = attractions.filter(item => item.selected).map(item => item.name);
         try {
           const response = await axios.post(`http://${ip}:3000/generate-schedule`, {
-            days: tripDetails.days,
+            checkin: tripDetails.checkin,
+            checkout: tripDetails.checkout,
             attractions: selectedAttractions,
             ...tripDetails,
           });
@@ -319,10 +326,17 @@ export default function CollectingTesting() {
                         {/* Trip duration and budget */}
                         <TextInput
                             style={styles.input}
-                            placeholder='Duration (days)'
+                            placeholder='checkin(YYYY-MM-DD)'
                             placeholderTextColor='#8892b0'
-                            value={tripDetails.days}
-                            onChangeText={(value) => changeTripDetails('days', value)}
+                            value={tripDetails.checkin}
+                            onChangeText={(value) => changeTripDetails('checkin', value)}
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder='checkout(YYYY-MM-DD)'
+                            placeholderTextColor='#8892b0'
+                            value={tripDetails.checkout}
+                            onChangeText={(value) => changeTripDetails('checkout', value)}
                         />
                         <TextInput
                             style={styles.input}
@@ -347,10 +361,17 @@ export default function CollectingTesting() {
                             <>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Number of hotels needed"
+                                    placeholder="Minimum amount of hotels"
                                     placeholderTextColor="#8892b0"
-                                    value={hotels.hotelAmount}
-                                    onChangeText={(value) => changeHotelsDetails('hotelAmount', value)}
+                                    value={hotels.hotelMinimum}
+                                    onChangeText={(value) => changeHotelsDetails('hotelMinimum', value)}
+                                />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Maximum amount of hotels"
+                                    placeholderTextColor="#8892b0"
+                                    value={hotels.hotelMaximum}
+                                    onChangeText={(value) => changeHotelsDetails('hotelMaximum', value)}
                                 />
                                 <TextInput
                                     style={styles.input}
@@ -358,13 +379,6 @@ export default function CollectingTesting() {
                                     placeholderTextColor="#8892b0"
                                     value={hotels.hotelBudget}
                                     onChangeText={(value) => changeHotelsDetails('hotelBudget', value)}
-                                />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Maximum number of hotels"
-                                    placeholderTextColor="#8892b0"
-                                    value={hotels.maximumHotels}
-                                    onChangeText={(value) => changeHotelsDetails('maximumHotels', value)}
                                 />
                             </>
                         )}
@@ -931,5 +945,34 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: 'center',
       },
+      flightLink: {
+        color: '#64ffda',
+        textDecorationLine: 'underline',
+        marginTop: 5,
+    },
+    flightDetails: {
+        padding: 16,
+    },
+    flightRoute: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    flightAirline: {
+        fontSize: 16,
+        color: '#ccc',
+        marginTop: 4,
+    },
+    flightDuration: {
+        fontSize: 14,
+        color: '#bbb',
+        marginTop: 4,
+    },
+    flightPrice: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#64ffda',
+        marginTop: 4,
+    },    
       
 });
