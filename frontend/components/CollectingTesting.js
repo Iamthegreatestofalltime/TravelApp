@@ -14,7 +14,12 @@ export default function CollectingTesting() {
     const [finalHotels, setFinalHotels] = useState([]);
     const [finalFlights, setFinalFlights] = useState([]);
     const [schedule, setSchedule] = useState('');
+    const [locationIndex, setLocationIndex] = useState(0); // Current location index
+    const [attractionsData, setAttractionsData] = useState({}); // Attractions stored as { cityName: attractions[] }
     const [attractions, setAttractions] = useState([]);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [isFlightBookingNeeded, setIsFlightBookingNeeded] = useState(false);
+    const [isCarBookingNeeded, setIsCarBookingNeeded] = useState(false);
     const [tripDetails, setTripDetails] = useState({
         people: '',
         checkin: '',
@@ -22,12 +27,41 @@ export default function CollectingTesting() {
         locations: [''],
         budget: '',
     });
+    const [locations, setLocations] = useState([
+        { name: '', arrivalDate: '', departureDate: '' },
+    ]);
+    const [customInstructions, setCustomInstructions] = useState('');
+    const [customInput, setCustomInput] = useState('');
+    const addLocation = () => {
+        setLocations((prev) => [
+            ...prev,
+            { name: '', arrivalDate: '', departureDate: '' },
+        ]);
+    };
+    const updateLocation = (index, field, value) => {
+        const updatedLocations = [...locations];
+        updatedLocations[index][field] = value;
+        setLocations(updatedLocations);
+    };
+    const deleteLocation = (index) => {
+        const updatedLocations = locations.filter((_, i) => i !== index);
+        setLocations(updatedLocations);
+    };
     const [hotels, setHotels] = useState({
         needHotels: false,
-        hotelMinimum: '',
-        hotelMaximum: '',
         hotelBudget: '',
-    });
+        preferredHotelChain: '', // New field for the preferred hotel chain
+    });    
+    const commonHotelChains = [
+        'Marriott',
+        'Hilton',
+        'Hyatt',
+        'IHG',
+        'Radisson',
+        'Best Western',
+        'Choice Hotels',
+        'Four Seasons',
+    ];    
     const [transportation, setTransportation] = useState({
         needTransportation: false,
         transportType: '',
@@ -81,10 +115,6 @@ export default function CollectingTesting() {
 
     const changeFerry = (key, value) => {
         setFerry(prev => ({ ...prev, [key]: value }));
-    };
-
-    const addLocation = () => {
-        setTripDetails(prev => ({ ...prev, locations: [...prev.locations, ''] }));
     };
 
     const changeLocation = (index, value) => {
@@ -146,22 +176,22 @@ export default function CollectingTesting() {
         });
         setStep(0);
     }
-    const fetchAttractions = async () => {
-  
+
+    const fetchAttractionsForLocation = async (locationName) => {
         try {
-            console.log('Fetching attractions with trip details:', tripDetails);
+            setLoading(true);
+            console.log(`Fetching attractions for ${locationName}...`);
             const response = await axios.post(`http://${ip}:3000/get-trip-plan`, {
                 checkin: tripDetails.checkin,
                 checkout: tripDetails.checkout,
-                locations: tripDetails.locations, // Ensure this is an array
+                locations: locationName,
                 money: tripDetails.budget,
             });
     
-            console.log('API Response:', response.data);
-    
+            console.log("Backend Response:", response.data);
             const attractions = response.data.attractions;
             if (attractions && attractions.length > 0) {
-                const attractionsList = attractions.map(attraction => ({
+                const attractionsList = attractions.map((attraction) => ({
                     name: attraction.name.trim(),
                     location: attraction.location.trim(),
                     estimated_cost: attraction.cost.trim(),
@@ -169,19 +199,43 @@ export default function CollectingTesting() {
                     selected: true,
                 }));
     
-                setAttractions(attractionsList);
-                nextStep();
+                setAttractionsData((prev) => {
+                    const updatedData = { ...prev, [locationName]: attractionsList };
+                    console.log("Updated Attractions Data:", updatedData);
+                    return updatedData;
+                });
             } else {
-                console.error('No attractions found in the response.');
+                console.error(`No attractions found for ${locationName}.`);
             }
         } catch (error) {
-            console.error('Error fetching attractions:', error);
-            if (error.response) {
-                console.error('Response data:', error.response.data);
-                console.error('Response status:', error.response.status);
-            }
+            console.error(`Error fetching attractions for ${locationName}:`, error);
+        } finally {
+            setLoading(false);
+        }
+    };     
+    
+    const nextLocationPage = () => {
+        const nextIndex = locationIndex + 1;
+
+        if (nextIndex < locations.length) {
+            setLocationIndex(nextIndex);
+            fetchAttractionsForLocation(locations[nextIndex].name);
+        } else {
+            setStep(step + 1); // Proceed to the next step (e.g., Hotels)
         }
     };
+    
+    const prevLocationPage = () => {
+        const prevIndex = locationIndex - 1;
+    
+        if (prevIndex >= 0) {
+            // Move to the previous location
+            setLocationIndex(prevIndex);
+        } else {
+            // If no previous location, go back to the previous step
+            setStep(step - 1);
+        }
+    };    
     
     const fetchHotels = async () => {
         setLoading(true);
@@ -193,7 +247,7 @@ export default function CollectingTesting() {
             console.log('Location being sent to test.js:', tripDetails.locations[0]);
     
             const testBackendResponse = await axios.post('http://192.168.5.45:3000/search-hotels', {
-                city: tripDetails.locations[0],
+                city: locations[0].name,
                 checkin: tripDetails.checkin,
                 checkout: tripDetails.checkout,
                 adultsNumber: tripDetails.people,
@@ -221,11 +275,79 @@ export default function CollectingTesting() {
             )
         );
     };
+
+    const renderAttractionsPage = () => {
+        const currentCity = locations[locationIndex]?.name || '';
+        const currentAttractions = attractionsData[currentCity] || [];
     
-    const toggleAttraction = (index) => {
-        setAttractions(prev => prev.map((item, i) => 
-          i === index ? { ...item, selected: !item.selected } : item
-        ));
+        console.log('Current City:', currentCity);
+        console.log('Current Attractions:', currentAttractions);
+    
+        return (
+            <View style={styles.container}>
+                <Text style={styles.stepTitle}>Attractions in {currentCity}</Text>
+                {loading ? (
+                    <Text style={styles.loadingText}>Loading attractions...</Text>
+                ) : (
+                    <ScrollView>
+                        {currentAttractions.length > 0 ? (
+                            currentAttractions.map((item, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={[
+                                        styles.attractionCard,
+                                        item.selected ? styles.selectedCard : styles.unselectedCard,
+                                    ]}
+                                    onPress={() => toggleAttraction(currentCity, index)}
+                                >
+                                    <Image
+                                        source={{ uri: item.image_url }}
+                                        style={styles.attractionImage}
+                                        resizeMode="cover"
+                                    />
+                                    <View style={styles.cardContent}>
+                                        <Text style={styles.attractionName}>{item.name}</Text>
+                                        <Text style={styles.attractionLocation}>Location: {item.location}</Text>
+                                        <Text style={styles.attractionCost}>Cost: {item.estimated_cost}</Text>
+                                    </View>
+                                    <Ionicons
+                                        name={item.selected ? 'checkmark-circle' : 'ellipse-outline'}
+                                        size={24}
+                                        color={item.selected ? '#64ffda' : '#ccc'}
+                                        style={styles.selectionIcon}
+                                    />
+                                </TouchableOpacity>
+                            ))
+                        ) : (
+                            <Text style={styles.noAttractionsText}>No attractions found.</Text>
+                        )}
+                    </ScrollView>
+                )}
+    
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                        style={[styles.button, { opacity: locationIndex === 0 ? 0.5 : 1 }]}
+                        onPress={prevLocationPage}
+                    >
+                        <Text style={styles.buttonText}>Previous</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.button} onPress={nextLocationPage}>
+                        <Text style={styles.buttonText}>
+                            {locationIndex === locations.length - 1 ? 'Next Step' : 'Next Location'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    };    
+    
+    const toggleAttraction = (cityName, index) => {
+        setAttractionsData((prev) => ({
+            ...prev,
+            [cityName]: prev[cityName].map((item, i) =>
+                i === index ? { ...item, selected: !item.selected } : item
+            ),
+        }));
     };
 
     
@@ -307,38 +429,45 @@ export default function CollectingTesting() {
                     <View>
                         <Text style={styles.stepTitle}>Trip Details</Text>
                         
-                        {/* Location input */}
-                        <Text style={styles.locationText}>Where are you planning to travel to?</Text>
-                        {tripDetails.locations.map((location, index) => (
-                            <TextInput
-                                key={index}
-                                style={styles.input}
-                                placeholder={`Location ${index + 1}`}
-                                placeholderTextColor="#8892b0"
-                                value={location}
-                                onChangeText={(value) => changeLocation(index, value)}
-                            />
+                        <Text style={styles.title}>Plan Your Locations</Text>
+
+                        {locations.map((location, index) => (
+                            <View key={index} style={styles.locationContainer}>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder={`Location ${index + 1}`}
+                                    placeholderTextColor="#8892b0"
+                                    value={location.name}
+                                    onChangeText={(value) => updateLocation(index, 'name', value)}
+                                />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Arrival Date (YYYY-MM-DD)"
+                                    placeholderTextColor="#8892b0"
+                                    value={location.arrivalDate}
+                                    onChangeText={(value) => updateLocation(index, 'arrivalDate', value)}
+                                />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Departure Date (YYYY-MM-DD)"
+                                    placeholderTextColor="#8892b0"
+                                    value={location.departureDate}
+                                    onChangeText={(value) => updateLocation(index, 'departureDate', value)}
+                                />
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={() => deleteLocation(index)}
+                                >
+                                    <Ionicons name="trash-outline" size={24} color="#fff" />
+                                    <Text style={styles.deleteButtonText}>Delete</Text>
+                                </TouchableOpacity>
+                            </View>
                         ))}
+
                         <TouchableOpacity style={styles.addButton} onPress={addLocation}>
                             <Ionicons name="add-circle-outline" size={24} color="#64ffda" />
-                            <Text style={styles.addText}>Add Location</Text>
+                            <Text style={styles.addButtonText}>Add Location</Text>
                         </TouchableOpacity>
-                        
-                        {/* Trip duration and budget */}
-                        <TextInput
-                            style={styles.input}
-                            placeholder='checkin(YYYY-MM-DD)'
-                            placeholderTextColor='#8892b0'
-                            value={tripDetails.checkin}
-                            onChangeText={(value) => changeTripDetails('checkin', value)}
-                        />
-                        <TextInput
-                            style={styles.input}
-                            placeholder='checkout(YYYY-MM-DD)'
-                            placeholderTextColor='#8892b0'
-                            value={tripDetails.checkout}
-                            onChangeText={(value) => changeTripDetails('checkout', value)}
-                        />
                         <TextInput
                             style={styles.input}
                             placeholder='Budget ($)'
@@ -349,7 +478,7 @@ export default function CollectingTesting() {
 
                         {/* Hotel details */}
                         <View style={styles.switchContainer}>
-                            <Text style={styles.switchLabel}>Do you need hotels?</Text>
+                            <Text style={styles.switchLabel}>Do you want to book a hotel?</Text>
                             <Switch
                                 value={hotels.needHotels}
                                 onValueChange={(value) => changeHotelsDetails('needHotels', value)}
@@ -362,254 +491,100 @@ export default function CollectingTesting() {
                             <>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Minimum amount of hotels"
-                                    placeholderTextColor="#8892b0"
-                                    value={hotels.hotelMinimum}
-                                    onChangeText={(value) => changeHotelsDetails('hotelMinimum', value)}
-                                />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Maximum amount of hotels"
-                                    placeholderTextColor="#8892b0"
-                                    value={hotels.hotelMaximum}
-                                    onChangeText={(value) => changeHotelsDetails('hotelMaximum', value)}
-                                />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Hotel budget ($)"
+                                    placeholder="Hotel budget / hotel"
                                     placeholderTextColor="#8892b0"
                                     value={hotels.hotelBudget}
                                     onChangeText={(value) => changeHotelsDetails('hotelBudget', value)}
                                 />
+
+                                <Text style={styles.label}>Preferred Hotel Chain (Optional)</Text>
+
+                                {/* Dropdown Toggle */}
+                                <TouchableOpacity
+                                    style={styles.dropdownToggle}
+                                    onPress={() => setDropdownOpen(!dropdownOpen)}
+                                >
+                                    <Text style={styles.dropdownToggleText}>
+                                        {hotels.preferredHotelChain || 'Choose'}
+                                    </Text>
+                                    <Ionicons
+                                        name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+                                        size={24}
+                                        color="#64ffda"
+                                    />
+                                </TouchableOpacity>
+
+                                {/* Dropdown List */}
+                                {dropdownOpen && (
+                                    <View style={styles.dropdownContainer}>
+                                        {commonHotelChains.map((chain, index) => (
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={[
+                                                    styles.dropdownItem,
+                                                    hotels.preferredHotelChain === chain && styles.selectedDropdownItem,
+                                                ]}
+                                                onPress={() => {
+                                                    changeHotelsDetails('preferredHotelChain', chain);
+                                                    setDropdownOpen(false); // Close dropdown after selection
+                                                }}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.dropdownText,
+                                                        hotels.preferredHotelChain === chain && styles.selectedDropdownText,
+                                                    ]}
+                                                >
+                                                    {chain}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
                             </>
                         )}
-
-                        {/* Transportation details */}
-                        <View style={styles.switchContainer}>
-                            <Text style={styles.switchLabel}>Do you need transportation?</Text>
-                            <Switch
-                                value={transportation.needTransportation}
-                                onValueChange={(value) => changeTransportationDetails('needTransportation', value)}
-                                thumbColor={transportation.needTransportation ? '#64ffda' : '#ccc'}
-                                trackColor={{ false: '#ccc', true: '#64ffda' }}
+                        <Text style={styles.switchLabel}>Do you want to book a flight?</Text>
+                        <Switch
+                            value={isFlightBookingNeeded}
+                            onValueChange={(value) => setIsFlightBookingNeeded(value)}
+                            thumbColor={isFlightBookingNeeded ? '#64ffda' : '#ccc'}
+                            trackColor={{ false: '#ccc', true: '#64ffda' }}
+                        />
+                        <Text style={styles.switchLabel}>Do you want to book a car rental?</Text>
+                        <Switch
+                            value={isCarBookingNeeded}
+                            onValueChange={(value) => setIsCarBookingNeeded(value)}
+                            thumbColor={isCarBookingNeeded ? '#64ffda' : '#ccc'}
+                            trackColor={{ false: '#ccc', true: '#64ffda' }}
+                        />
+                        <View style={styles.customSection}>
+                            <Text style={styles.customLabel}>Additional Instructions (Optional)</Text>
+                            <TextInput
+                                style={[styles.input, styles.multilineInput]}
+                                placeholder="Add any additional information"
+                                placeholderTextColor="#8892b0"
+                                value={customInstructions}
+                                onChangeText={(value) => setCustomInstructions(value)}
+                                multiline={true}
+                                numberOfLines={4}
                             />
                         </View>
-
-                        {transportation.needTransportation && (
-                            <View>
-                                <Text style={styles.locationText}>Select type of transportation</Text>
-                                <TouchableOpacity
-                                    style={[styles.addButton, transportation.transportType === 'Airplane' && styles.selectedButton]}
-                                    onPress={() => selectTransportType('Airplane')}
-                                >
-                                    <Ionicons name="airplane" size={24} color={transportation.transportType === 'Airplane' ? '#0f0c29' : '#64ffda'} />
-                                    <Text style={[styles.addText, transportation.transportType === 'Airplane' && styles.selectedText]}>Airplane</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.addButton, transportation.transportType === 'Train' && styles.selectedButton]}
-                                    onPress={() => selectTransportType('Train')}
-                                >
-                                    <Ionicons name="train" size={24} color={transportation.transportType === 'Train' ? '#0f0c29' : '#64ffda'} />
-                                    <Text style={[styles.addText, transportation.transportType === 'Train' && styles.selectedText]}>Train</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.addButton, transportation.transportType === 'Car' && styles.selectedButton]}
-                                    onPress={() => selectTransportType('Car')}
-                                >
-                                    <Ionicons name="car" size={24} color={transportation.transportType === 'Car' ? '#0f0c29' : '#64ffda'} />
-                                    <Text style={[styles.addText, transportation.transportType === 'Car' && styles.selectedText]}>Car</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.addButton, transportation.transportType === 'Ferry' && styles.selectedButton]}
-                                    onPress={() => selectTransportType('Ferry')}
-                                >
-                                    <Ionicons name="boat" size={24} color={transportation.transportType === 'Ferry' ? '#0f0c29' : '#64ffda'} />
-                                    <Text style={[styles.addText, transportation.transportType === 'Ferry' && styles.selectedText]}>Ferry</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {/* Transportation-specific questions */}
-                        {transportation.needTransportation && (
-                            <>
-                                {/* Airplane-specific questions */}
-                                {transportation.transportType === 'Airplane' && (
-                                    <>
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Specific airline"
-                                            placeholderTextColor="#8892b0"
-                                            value={airplane.specificAirline}
-                                            onChangeText={(value) => changeAirplane('specificAirline', value)}
-                                        />
-                                        <View style={styles.switchContainer}>
-                                            <Text style={styles.switchLabel}>Round Trip?</Text>
-                                            <Switch
-                                                value={airplane.roundTrip}
-                                                onValueChange={(value) => changeAirplane('roundTrip', value)}
-                                                thumbColor={airplane.roundTrip ? '#64ffda' : '#ccc'}
-                                                trackColor={{ false: '#ccc', true: '#64ffda' }}
-                                            />
-                                        </View>
-                                        {airplane.airlinesToAvoid.map((airline, index) => (
-                                            <TextInput
-                                                key={index}
-                                                style={styles.input}
-                                                placeholder={`Airline to avoid ${index + 1}`}
-                                                placeholderTextColor="#8892b0"
-                                                value={airline}
-                                                onChangeText={(value) => changeAirlinesToAvoid(index, value)}
-                                            />
-                                        ))}
-                                        <TouchableOpacity style={styles.addButton} onPress={addAirlineToAvoid}>
-                                            <Ionicons name="add-circle-outline" size={24} color="#64ffda" />
-                                            <Text style={styles.addText}>Add Airline to Avoid</Text>
-                                        </TouchableOpacity>
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Airplane budget ($)"
-                                            placeholderTextColor="#8892b0"
-                                            value={airplane.budget}
-                                            onChangeText={(value) => changeAirplane('budget', value)}
-                                        />
-                                    </>
-                                )}
-
-                                {/* Train-specific questions */}
-                                {transportation.transportType === 'Train' && (
-                                    <>
-                                        <View style={styles.switchContainer}>
-                                            <Text style={styles.switchLabel}>Round Trip?</Text>
-                                            <Switch
-                                                value={train.roundTrip}
-                                                onValueChange={(value) => changeTrain('roundTrip', value)}
-                                                thumbColor={train.roundTrip ? '#64ffda' : '#ccc'}
-                                                trackColor={{ false: '#ccc', true: '#64ffda' }}
-                                            />
-                                        </View>
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Train budget ($)"
-                                            placeholderTextColor="#8892b0"
-                                            value={train.budget}
-                                            onChangeText={(value) => changeTrain('budget', value)}
-                                        />
-                                    </>
-                                )}
-
-                                {/* Car-specific questions */}
-                                {transportation.transportType === 'Car' && (
-                                    <>
-                                        <View style={styles.switchContainer}>
-                                            <Text style={styles.switchLabel}>Do you need a car?</Text>
-                                            <Switch
-                                                value={car.needCar}
-                                                onValueChange={(value) => changeCar('needCar', value)}
-                                                thumbColor={car.needCar ? '#64ffda' : '#ccc'}
-                                                trackColor={{ false: '#ccc', true: '#64ffda' }}
-                                            />
-                                        </View>
-                                        {car.needCar && (
-                                            <>
-                                                <TextInput
-                                                    style={styles.input}
-                                                    placeholder="Days with car rental"
-                                                    placeholderTextColor="#8892b0"
-                                                    value={car.daysWithCarRental}
-                                                    onChangeText={(value) => changeCar('daysWithCarRental', value)}
-                                                />
-                                                <TextInput
-                                                    style={styles.input}
-                                                    placeholder="Car budget ($)"
-                                                    placeholderTextColor="#8892b0"
-                                                    value={car.budget}
-                                                    onChangeText={(value) => changeCar('budget', value)}
-                                                />
-                                            </>
-                                        )}
-                                    </>
-                                )}
-
-                                {/* Ferry-specific questions */}
-                                {transportation.transportType === 'Ferry' && (
-                                    <>
-                                        <View style={styles.switchContainer}>
-                                            <Text style={styles.switchLabel}>Round Trip?</Text>
-                                            <Switch
-                                                value={ferry.roundTrip}
-                                                onValueChange={(value) => changeFerry('roundTrip', value)}
-                                                thumbColor={ferry.roundTrip ? '#64ffda' : '#ccc'}
-                                                trackColor={{ false: '#ccc', true: '#64ffda' }}
-                                            />
-                                        </View>
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Ferry budget ($)"
-                                            placeholderTextColor="#8892b0"
-                                            value={ferry.budget}
-                                            onChangeText={(value) => changeFerry('budget', value)}
-                                        />
-                                    </>
-                                )}
-                            </>
-                        )}
-
                         {/* Start Over and Next buttons */}
                         <View style={styles.buttonContainer}>
                             <TouchableOpacity style={styles.button} onPress={startOver}>
                                 <Text style={styles.buttonText}>Start Over</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.button} onPress={fetchAttractions}>
+                            <TouchableOpacity
+                                style={styles.button}
+                                onPress={() => fetchAttractionsForLocation(locations[locationIndex].name) && nextStep()}
+                            >
                                 <Text style={styles.buttonText}>Next</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 );
                 case 1:
-                    return (
-                      <View style={styles.container}>
-                        <Text style={styles.stepTitle}>Select Attractions</Text>
-                  
-                        {/* ScrollView for vertical scrolling */}
-                        <ScrollView>
-                          {attractions.map((item, index) => (
-                            <TouchableOpacity
-                              key={index}
-                              style={[styles.attractionCard, item.selected ? styles.selectedCard : styles.unselectedCard]}
-                              onPress={() => toggleAttraction(index)}
-                            >
-                              {/* Image at the top of each card   */}
-                              <Image
-                                source={{ uri: item.image_url}}
-                                style={styles.attractionImage}
-                                resizeMode="cover"
-                              />
-                              <View style={styles.cardContent}>
-                                <Text style={styles.attractionName}>{item.name}</Text>
-                                <Text style={styles.attractionLocation}>Location: {item.location}</Text>
-                                <Text style={styles.attractionCost}>Cost: {item.estimated_cost}</Text>
-                              </View>
-                  
-                              {/* Selection Icon */}
-                              <Ionicons
-                                name={item.selected ? "checkmark-circle" : "ellipse-outline"}
-                                size={24}
-                                color={item.selected ? "#64ffda" : "#ccc"}
-                                style={styles.selectionIcon}
-                              />
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                  
-                        {/* Buttons for proceeding or going back */}
-                        <TouchableOpacity style={styles.button} onPress={fetchHotels}>
-                          <Text style={styles.buttonText}>Hotels</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.button} onPress={prevStep}>
-                          <Text style={styles.buttonText}>Back</Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
+                    return renderAttractionsPage();
             case 2:
                     return (
                         <View style={styles.container}>
@@ -974,6 +949,53 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#64ffda',
         marginTop: 4,
-    },    
-      
+    },   
+    addButtonText: {
+        fontSize: 16,
+        color: '#64ffda',
+        marginLeft: 10,
+    }, 
+    dropdownContainer: {
+        backgroundColor: '#1e1e2e',
+        borderRadius: 8,
+        paddingVertical: 10,
+        marginVertical: 10,
+    },
+    dropdownItem: {
+        padding: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#444',
+    },
+    dropdownText: {
+        color: '#ccc',
+        fontSize: 16,
+    },
+    selectedDropdownItem: {
+        backgroundColor: '#64ffda',
+    },
+    selectedDropdownText: {
+        color: '#0f0c29',
+        fontWeight: 'bold',
+    },
+    label: {
+        fontSize: 16,
+        color: '#fff',
+        marginTop: 10,
+        marginBottom: 5,
+    },
+    deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 8,
+        backgroundColor: '#ff4d4d',
+        borderRadius: 12,
+        marginTop: -5,
+        marginBottom: 8,
+    },
+    deleteButtonText: {
+        color: '#fff',
+        marginLeft: 10,
+        fontSize: 16,
+    },
 });

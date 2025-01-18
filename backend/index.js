@@ -120,16 +120,19 @@ async function getImage(query) {
 
 app.post('/get-trip-plan', async (req, res) => {
     console.log('Request body:', req.body);
-    const { days, locations, money } = req.body;
+    const { day1, day2, locations, money } = req.body;
+    const startDate = new Date(day1); // day1 is '2025-11-01'
+    const endDate = new Date(day2); // day2 is '2025-12-06'
 
-    if (!Array.isArray(locations) || locations.length === 0) {
-        console.error('Invalid locations provided:', locations);
-        return res.status(400).json({ error: 'Invalid locations provided.' });
-    }
+    // Calculate the difference in time (milliseconds)
+    const diffTime = endDate - startDate;
 
-    console.log(`Planning attractions for: ${locations.join(", ")} over ${days} days with a budget of ${money}`);
+    // Convert the difference from milliseconds to days
+    const days = diffTime / (1000 * 60 * 60 * 24);
+    
+    console.log(days);
 
-    const prompt = `Can you plan some attractions for me to see in ${locations.join(", ")} over the course of ${days} days with a budget of ${money}? 
+    const prompt = `Can you plan some attractions for me to see in ${locations} over the course of ${days} days with a budget of ${money}? 
     Please return the result as a JSON object where each attraction includes the following fields:
     {
       name: "Attraction name",
