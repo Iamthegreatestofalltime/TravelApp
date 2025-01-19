@@ -251,10 +251,10 @@ const getDestinationId = async (cityName) => {
 app.post('/search-hotels', async (req, res) => {
     console.log('Received request:', req.body);
 
-    const { city } = req.body; // Only need the city for this example
-    const checkInDate = "2025-03-18"; // Check-in date
-    const checkOutDate = "2025-03-19"; // Check-out date
-    const adultsNumber = 2; // Number of adults
+    const { city, checkin, checkout, preferredChain } = req.body; 
+    const checkInDate = checkin;
+    const checkOutDate = checkout;
+    const adultsNumber = 2; // or parse from req.body if needed
     const roomNumber = 1;
 
     try {
@@ -270,7 +270,7 @@ app.post('/search-hotels', async (req, res) => {
           method: 'GET',
           url: 'https://booking-com.p.rapidapi.com/v2/hotels/search',
           params: {
-            dest_id: destination.dest_id, // Use the valid destination ID
+            dest_id: destination.dest_id,
             order_by: 'popularity',
             checkout_date: checkOutDate,
             filter_by_currency: 'USD',
@@ -294,15 +294,13 @@ app.post('/search-hotels', async (req, res) => {
         const response = await axios.request(options);
         const hotels = response.data.results;
 
-        console.log(hotels);
-
         if (!hotels || hotels.length === 0) {
             console.log('No hotels found.');
             return res.status(404).json({ error: 'No hotels found' });
         }
 
-        // Format the hotels and limit to 3 results
-        const formattedHotels = hotels.slice(0, 5).map(hotel => ({
+        // Format hotels
+        let formattedHotels = hotels.slice(0, 15).map(hotel => ({
             name: hotel.name,
             price: hotel.priceBreakdown?.grossPrice?.value,
             currency: hotel.priceBreakdown?.currency,
@@ -316,9 +314,22 @@ app.post('/search-hotels', async (req, res) => {
             photoUrl: hotel.photoMainUrl
         }));
 
-        console.log("Filtered Hotels:", formattedHotels);
+        // 1) If user has a preferredChain, move those hotels to the top
+        if (preferredChain) {
+            const chainLower = preferredChain.toLowerCase();
 
-        // Send the formatted hotels directly to the frontend
+            formattedHotels.sort((a, b) => {
+                const aHasChain = a.name?.toLowerCase().includes(chainLower);
+                const bHasChain = b.name?.toLowerCase().includes(chainLower);
+
+                if (aHasChain && !bHasChain) return -1;
+                if (!aHasChain && bHasChain) return 1;
+                return 0;
+            });
+        }
+
+        console.log("Filtered Hotels:", formattedHotels);
+        // Return the updated, sorted list
         res.json(formattedHotels);
     } catch (error) {
         console.error('Error in hotel search:', error);
