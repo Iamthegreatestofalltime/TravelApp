@@ -338,14 +338,14 @@ app.post('/search-hotels', async (req, res) => {
 });
 
 app.post('/flight-search', async (req, res) => {
-    const {
-        originLocationCode = 'BOM.AIRPORT', // Ensure airport codes have `.AIRPORT`
-        destinationLocationCode = 'DEL.AIRPORT',
-        departureDate = '2025-06-06',
-        returnDate = '2025-02-27',
-        cabinClass = 'ECONOMY',
+    let {
+        originLocationCode,    // e.g. "LAX.AIRPORT"
+        destinationLocationCode, // e.g. "JFK.AIRPORT"
+        departureDate,         // e.g. "2025-06-01"
+        returnDate,            // optional
+        cabinClass = 'ECONOMY', 
         travelersCount = 1,
-    } = req.body;
+      } = req.body;    
 
     // Validate required parameters
     if (!originLocationCode || !destinationLocationCode || !departureDate) {
@@ -354,20 +354,25 @@ app.post('/flight-search', async (req, res) => {
         });
     }
 
+    if (!returnDate) {
+        // For now, just set the returnDate to be the same as departureDate, or pick any logic you prefer
+        returnDate = departureDate;
+      }
+
     const options = {
         method: 'GET',
         url: 'https://booking-com15.p.rapidapi.com/api/v1/flights/searchFlights',
         params: {
-            fromId: 'JFK.AIRPORT',
-            toId: 'LAX.AIRPORT',
-            departDate: '2025-02-21',
-            returnDate: '2025-02-27',
+            fromId: originLocationCode,    // e.g. "LAX.AIRPORT"
+            toId: destinationLocationCode, // e.g. "JFK.AIRPORT"
+            departDate: departureDate,     // e.g. "2025-06-01"
+            returnDate: returnDate,        // or remove if truly one-way
             pageNo: '1',
-            adults: '1',
-            children: '2',
+            adults: String(travelersCount),  // must be string
+            children: '0',    // adjust if you allow children count
             sort: 'BEST',
-            cabinClass: 'ECONOMY',
-            currency_code: 'USD'
+            cabinClass: cabinClass,  // e.g. "ECONOMY"
+            currency_code: 'USD',
         },
         headers: {
             'x-rapidapi-key': '85c91089b0msh686addf0b8fc375p1419b1jsnbc1746df1099',
@@ -381,30 +386,28 @@ app.post('/flight-search', async (req, res) => {
 
         if (response.data?.data?.flightOffers) {
             const flights = response.data.data.flightOffers.map((flight) => {
-                return {
-                    airline: flight.segments[0].legs[0].carriersData?.[0]?.name || 'Unknown',
-                    logo: flight.segments[0].legs[0].carriersData?.[0]?.logo || null,
-                    price: flight.priceBreakdown?.total?.units || 'Unknown',
-                    currency: flight.priceBreakdown?.total?.currencyCode || 'USD',
-                    departureAirport: flight.segments?.[0]?.departureAirport?.name || 'Unknown',
-                    departureCity: flight.segments?.[0]?.departureAirport?.cityName || 'Unknown',
-                    arrivalAirport: flight.segments?.[0]?.arrivalAirport?.name || 'Unknown',
-                    arrivalCity: flight.segments?.[0]?.arrivalAirport?.cityName || 'Unknown',
-                    departureTime: flight.segments?.[0]?.departureTime || 'Unknown',
-                    arrivalTime: flight.segments?.[0]?.arrivalTime || 'Unknown',
-                    connections: flight.segments?.length > 1 ? flight.segments.length - 1 : 0,
-                    duration: flight.segments?.reduce((total, segment) => total + segment.totalTime, 0) || 'Unknown',
-                    baggageInfo: {
-                        cabinBaggage: flight.travellerCabinLuggage?.[0]?.luggageAllowance || 'Unknown',
-                        checkedBaggage: flight.travellerCheckedLuggage?.[0]?.luggageAllowance || 'Unknown',
-                    },
-                    amenities: flight.legs?.[0]?.amenities || [],
-                };
+              return {
+                airline: flight.segments[0].legs[0].carriersData?.[0]?.name || 'Unknown',
+                logo: flight.segments[0].legs[0].carriersData?.[0]?.logo || null,
+                price: flight.priceBreakdown?.total?.units || 'Unknown',
+                currency: flight.priceBreakdown?.total?.currencyCode || 'USD',
+                departureAirport: flight.segments?.[0]?.departureAirport?.name || 'Unknown',
+                departureCity: flight.segments?.[0]?.departureAirport?.cityName || 'Unknown',
+                arrivalAirport: flight.segments?.[0]?.arrivalAirport?.name || 'Unknown',
+                arrivalCity: flight.segments?.[0]?.arrivalAirport?.cityName || 'Unknown',
+                departureTime: flight.segments?.[0]?.departureTime || 'Unknown',
+                arrivalTime: flight.segments?.[0]?.arrivalTime || 'Unknown',
+                connections: flight.segments?.length > 1 ? flight.segments.length - 1 : 0,
+                duration: flight.segments?.reduce((total, segment) => total + segment.totalTime, 0) || 'Unknown',
+                baggageInfo: {
+                  cabinBaggage: flight.travellerCabinLuggage?.[0]?.luggageAllowance || 'Unknown',
+                  checkedBaggage: flight.travellerCheckedLuggage?.[0]?.luggageAllowance || 'Unknown',
+                },
+                amenities: flight.legs?.[0]?.amenities || [],
+              };
             });
-            console.log('Full details of the last flight:', JSON.stringify(response.data.data.flightOffers));
-        
-            res.status(200).json({ flights });
-        } else {
+            return res.status(200).json({ flights });
+        }else {
             res.status(404).json({ error: 'No flights found.' });
         }
     } catch (error) {

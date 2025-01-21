@@ -23,7 +23,6 @@ export default function CollectingTesting() {
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(0);
 
-    // Attractions data structure
     const [attractionsData, setAttractionsData] = useState({}); // { cityName: [ { name, ... }, ... ] }
     
     const [hotels, setHotels] = useState({
@@ -49,6 +48,39 @@ export default function CollectingTesting() {
         }
     }, [step, locationIndex, hotels.needHotels]);
 
+    function generateFlightLegs() {
+        const legs = [];
+        const { originAirport } = tripDetails;
+        // Clean up the origin so it matches your format (e.g. "LAX.AIRPORT")
+        const fromOrigin = originAirport.toUpperCase().includes('.AIRPORT')
+          ? originAirport
+          : originAirport.toUpperCase() + '.AIRPORT';
+    
+        if (!locations || locations.length === 0) {
+          return legs; 
+        }
+    
+        // Leg 1: origin --> first city
+        legs.push({
+          fromCity: fromOrigin,
+          toCity: findNearestAirport(locations[0].name),
+          // Choose whichever date you want for departure
+          departureDate: locations[0].arrivalDate || tripDetails.checkin, 
+        });
+    
+        // Middle legs: city[i-1] -> city[i]
+        for (let i = 1; i < locations.length; i++) {
+          legs.push({
+            fromCity: findNearestAirport(locations[i - 1].name),
+            toCity: findNearestAirport(locations[i].name),
+            // You can decide if you want to use the “departureDate” from the
+            // previous city or the “arrivalDate” from the next city:
+            departureDate: locations[i].arrivalDate,
+          });
+        }
+        return legs;
+      }    
+
     useEffect(() => {
         if (step === 3 && isFlightBookingNeeded && finalFlights.length === 0) {
           console.log("Triggering flight fetch...");
@@ -62,6 +94,7 @@ export default function CollectingTesting() {
         checkout: '',
         locations: [''],
         budget: '',
+        originAirport: '',
     });
 
     const [locations, setLocations] = useState([
@@ -76,12 +109,22 @@ export default function CollectingTesting() {
         'Hyatt',
         'IHG',
         'Radisson',
-        'Best Western',
-        'Choice Hotels',
-        'Four Seasons',
+        'Holiday',
+        'Hampton',
     ];
 
     const [dropdownOpen, setDropdownOpen] = useState(false);
+
+    function findNearestAirport(cityName) {
+        const cityToAirportMap = {
+        'New York': 'JFK.AIRPORT',
+        'Los Angeles': 'LAX.AIRPORT',
+        'London': 'LHR.AIRPORT',
+        'Paris': 'CDG.AIRPORT',
+        'Dubai': 'DXB.AIRPORT',
+        };
+        return cityToAirportMap[cityName] || (cityName.toUpperCase() + '.AIRPORT');
+    }  
 
     const addLocation = () => {
         setLocations((prev) => [
@@ -396,98 +439,144 @@ export default function CollectingTesting() {
     const fetchFlights = async () => {
         setLoading(true);
         try {
-            console.log('Fetching flights...');
-            const testBackendResponse = await axios.post(`http://${ip}:3000/flight-search`, {
-                originLocationCode: "JFK.AIRPORT",
-                destinationLocationCode: "LAX.AIRPORT",
-                departureDate: "2025-06-01",
-                cabinClass: "ECONOMY",
-                travelersCount: 1,
+          console.log('Fetching multi-leg flights...');
+          const legs = generateFlightLegs();
+          const allLegsData = [];
+    
+          // For each leg, call your backend to get flight options
+          for (let i = 0; i < legs.length; i++) {
+            const leg = legs[i];
+            console.log(`Fetching flight leg: ${leg.fromCity} => ${leg.toCity} on ${leg.departureDate}`);
+    
+            // Adjust your post body or query params if your backend expects something else
+            const response = await axios.post(`http://${ip}:3000/flight-search`, {
+              originLocationCode: leg.fromCity,
+              destinationLocationCode: leg.toCity,
+              departureDate: leg.departureDate,  // or something from the location
+              cabinClass: "ECONOMY",
+              travelersCount: tripDetails.people || 1,
             });
     
-            console.log("Flights response:", testBackendResponse.data);
+            // Each flight in the response
+            const flightsForThisLeg = (response.data.flights || []).map(flight => ({
+              ...flight,
+              selected: false,
+            }));
     
-            if (testBackendResponse.data && testBackendResponse.data.flights) {
-                const flights = testBackendResponse.data.flights.map((flight) => ({
-                    ...flight,
-                    selected: false,
-                }));
-                setFinalFlights(flights);
-            } else {
-                console.error('No flights found');
-                setFinalFlights([]);
-            }
+            // Keep track of which leg this data belongs to
+            allLegsData.push({
+              fromCity: leg.fromCity,
+              toCity: leg.toCity,
+              departureDate: leg.departureDate,
+              flights: flightsForThisLeg,
+            });
+          }
+    
+          setFinalFlights(allLegsData);
         } catch (error) {
-            console.error("Error fetching flights:", error);
-            setFinalFlights([]);
+          console.error("Error fetching flights:", error);
+          setFinalFlights([]);
         } finally {
-            setLoading(false);
+          setLoading(false);
         }
-    };
+      };    
 
-    const toggleFinalFlights = (index) => {
-        setFinalFlights(prevFlights => 
-            prevFlights.map((flight, i) => 
-                i === index ? {...flight, selected: !flight.selected} : flight
-            )
+      const toggleFlightSelection = (legIndex, flightIndex) => {
+        setFinalFlights((prev) =>
+          prev.map((leg, i) => {
+            if (i === legIndex) {
+              const updatedFlights = leg.flights.map((f, idx) => 
+                idx === flightIndex ? { ...f, selected: !f.selected } : f
+              );
+              return { ...leg, flights: updatedFlights };
+            }
+            return leg;
+          })
         );
-    };
+      };    
 
-    const renderFlightsPage = () => {
-        return (
+      const renderFlightsPage = () => {
+        if (loading) {
+          return (
             <View style={styles.container}>
-                <Text style={styles.stepTitle}>Select Flights</Text>
-                {loading ? (
-                    <Text style={styles.loadingText}>Loading Flights...</Text>
-                ) : (
-                    <ScrollView contentContainerStyle={styles.scrollViewContent}>
-                        {finalFlights.length > 0 ? (
-                            finalFlights.map((flight, index) => (
-                                <TouchableOpacity
-                                    key={index}
-                                    style={[
-                                        styles.flightCard,
-                                        flight.selected ? styles.selectedCard : styles.unselectedCard,
-                                    ]}
-                                    onPress={() => toggleFinalFlights(index)}
-                                >
-                                    <Text style={styles.flightRoute}>
-                                        {flight.departureAirport} ➡️ {flight.arrivalAirport}
-                                    </Text>
-                                    <Text style={styles.flightAirline}>Airline: {flight.airline}</Text>
-                                    <Text style={styles.flightPrice}>
-                                        Price: {flight.price} {flight.currency}
-                                    </Text>
-                                    <Text style={styles.flightDuration}>Duration: {flight.duration}</Text>
-                                    <Text style={styles.flightConnections}>
-                                        {flight.connections && flight.connections.length > 0
-                                            ? `Connections: ${flight.connections.join(', ')}`
-                                            : 'Direct flight'}
-                                    </Text>
-                                    <Ionicons
-                                        name={flight.selected ? 'checkmark-circle' : 'ellipse-outline'}
-                                        size={24}
-                                        color={flight.selected ? '#64ffda' : '#ccc'}
-                                        style={styles.selectionIcon}
-                                    />
-                                </TouchableOpacity>
-                            ))
-                        ) : (
-                            <Text style={styles.noFlightsText}>No flights found.</Text>
-                        )}
-                    </ScrollView>
-                )}
-                <View style={styles.buttonContainer}>
-                    <TouchableOpacity style={styles.button} onPress={generateSchedule}>
-                        <Text style={styles.buttonText}>Generate Schedule</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.button} onPress={prevStep}>
-                        <Text style={styles.buttonText}>Back</Text>
-                    </TouchableOpacity>
-                </View>
+              <Text style={styles.loadingText}>Loading Flights...</Text>
             </View>
+          );
+        }
+    
+        if (!finalFlights || finalFlights.length === 0) {
+          return (
+            <View style={styles.container}>
+              <Text style={styles.noFlightsText}>No flights data found.</Text>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity style={styles.button} onPress={prevStep}>
+                  <Text style={styles.buttonText}>Back</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        }
+    
+        // Show each leg’s flight options
+        return (
+          <View style={styles.container}>
+            <ScrollView contentContainerStyle={styles.scrollViewContent}>
+              {finalFlights.map((legData, legIndex) => (
+                <View key={legIndex} style={{ marginBottom: 20 }}>
+                  <Text style={styles.stepTitle}>
+                    Leg {legIndex + 1}: {legData.fromCity} ➜ {legData.toCity}
+                  </Text>
+                  {legData.flights && legData.flights.length > 0 ? (
+                    legData.flights.map((flight, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.flightCard,
+                          flight.selected ? styles.selectedCard : styles.unselectedCard,
+                        ]}
+                        onPress={() => toggleFlightSelection(legIndex, index)}
+                      >
+                        <Text style={styles.flightRoute}>
+                          {flight.departureAirport} ➡️ {flight.arrivalAirport}
+                        </Text>
+                        <Text style={styles.flightAirline}>Airline: {flight.airline}</Text>
+                        <Text style={styles.flightPrice}>
+                          Price: {flight.price} {flight.currency}
+                        </Text>
+                        <Text style={styles.flightDuration}>Duration: {flight.duration}</Text>
+                        {flight.connections ? (
+                          <Text style={styles.flightConnections}>
+                            Connections: {flight.connections}
+                          </Text>
+                        ) : (
+                          <Text style={styles.flightConnections}>Direct flight</Text>
+                        )}
+                        <Ionicons
+                          name={flight.selected ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={24}
+                          color={flight.selected ? '#64ffda' : '#ccc'}
+                          style={styles.selectionIcon}
+                        />
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.noFlightsText}>No flight options for this leg.</Text>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+    
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.button} onPress={prevStep}>
+                <Text style={styles.buttonText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.button} onPress={() => setStep(4)}>
+                <Text style={styles.buttonText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         );
-    };
+      };
 
     const generateSchedule = async () => {
         try {
@@ -678,6 +767,15 @@ export default function CollectingTesting() {
                             thumbColor={isFlightBookingNeeded ? '#64ffda' : '#ccc'}
                             trackColor={{ false: '#ccc', true: '#64ffda' }}
                         />
+                        {isFlightBookingNeeded && (
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Origin Airport Code (e.g. LAX)"
+                                placeholderTextColor="#8892b0"
+                                value={tripDetails.originAirport}
+                                onChangeText={(value) => changeTripDetails('originAirport', value)}
+                            />
+                        )}
                         <Text style={styles.switchLabel}>Do you want to book a car rental?</Text>
                         <Switch
                             value={isCarBookingNeeded}
@@ -724,17 +822,21 @@ export default function CollectingTesting() {
                 return renderHotelsPage();                  
 
             case 3:
+                // Step 3: Handle flight booking if needed
                 if (!isFlightBookingNeeded) {
                     setStep(4);
                     return null;
                 }
+                // If we do need flights, let's show the flights:
                 return (
                     <View>
+                    {/* If still loading or flights not fetched */}
                     {finalFlights.length === 0 ? (
                         <Text>Loading flights ...</Text>
                     ) : (
                         <View>
                         {renderFlightsPage()}
+                        {/* After selecting flights in the flight page, user can continue */}
                         <TouchableOpacity style={styles.button} onPress={() => setStep(4)}>
                             <Text style={styles.buttonText}>Continue</Text>
                         </TouchableOpacity>
@@ -742,12 +844,23 @@ export default function CollectingTesting() {
                     )}
                     </View>
                 );
-            
 
             case 4:
-                return renderFlightsPage();
+                // Step 4: Option to generate schedule now that flights are chosen
+                return (
+                    <View style={styles.container}>
+                    <Text style={styles.stepTitle}>Ready to Generate Schedule?</Text>
+                    <TouchableOpacity style={styles.button} onPress={generateSchedule}>
+                        <Text style={styles.buttonText}>Generate Schedule</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.button} onPress={prevStep}>
+                        <Text style={styles.buttonText}>Back</Text>
+                    </TouchableOpacity>
+                    </View>
+                );
 
             case 5:
+                // Step 5: Show final schedule
                 return renderSchedulePage();
 
             default:
